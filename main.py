@@ -23,12 +23,19 @@ def get_market_data():
     for name, symbol in tickers.items():
         try:
             ticker = yf.Ticker(symbol)
-            hist = ticker.history(period="5d")
+            hist = ticker.history(period="1y")
 
             if len(hist) >= 2:
-                close = hist["Close"].tail(2).values
-                change = ((close[-1] - close[-2]) / close[-2]) * 100
-                data[name] = round(float(change), 2)
+
+    current_price = hist["Close"].iloc[-1]
+    high_price = hist["Close"].max()
+
+    drawdown = (
+        (current_price - high_price)
+        / high_price
+    ) * 100
+
+    data[name] = round(float(drawdown), 2)
             else:
                 data[name] = 0.0
 
@@ -46,23 +53,22 @@ def score_market(data):
 
     sp = data.get("S&P500", 0)
     nd = data.get("NASDAQ", 0)
-    vix = data.get("VIX", 0)
 
     score = 0
 
-    if sp <= -1:
+    if sp <= -5:
         score += 20
 
-    if sp <= -2:
+    if sp <= -10:
         score += 20
 
-    if nd <= -2:
+    if nd <= -10:
         score += 20
 
-    if nd <= -4:
+    if nd <= -15:
         score += 20
 
-    if vix >= 10:
+    if nd <= -20:
         score += 20
 
     return min(score, 100)
@@ -71,21 +77,26 @@ def get_market_comment(data, score):
 
     sp = data.get("S&P500", 0)
     nd = data.get("NASDAQ", 0)
-    vix = data.get("VIX", 0)
 
     comments = []
 
-    if nd > 1:
-        comments.append("나스닥이 강세를 보이며 성장주 투자심리가 개선되고 있습니다.")
+    comments.append(
+        f"S&P500은 최근 1년 최고점 대비 {abs(sp):.1f}% 하락 상태입니다."
+    )
 
-    if sp > 0.5:
-        comments.append("S&P500 상승으로 미국 주식 전반의 분위기는 긍정적입니다.")
+    comments.append(
+        f"NASDAQ100은 최근 1년 최고점 대비 {abs(nd):.1f}% 하락 상태입니다."
+    )
 
-    if vix < -5:
-        comments.append("VIX가 크게 하락하여 시장 불안감은 완화된 상태입니다.")
+    if nd <= -10:
+        comments.append(
+            "기술주 중심의 조정이 진행되고 있습니다."
+        )
 
-    if score >= 75:
-        comments.append("다만 시장이 강세 구간이므로 공격적인 추가매수는 신중하게 접근하는 것이 좋습니다.")
+    if nd <= -20:
+        comments.append(
+            "과거 기준으로 의미있는 매수 구간에 접근하고 있습니다."
+        )
 
     return "\n".join(comments)
 
