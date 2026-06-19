@@ -9,7 +9,7 @@ CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 os.environ["GEMINI_API_KEY"]
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-2.0-flash")
 
 # -----------------------------
 # 1. 시장 데이터 수집
@@ -74,8 +74,7 @@ USD/KRW: {data.get('USDKRW')}
         return response.text
 
     except Exception as e:
-        print("AI ERROR:", e)
-        return f"AI 분석 실패 ({str(e)[:50]})"
+        return f"AI 오류: {str(e)}"
         
 # -----------------------------
 # 3. 브리핑 생성
