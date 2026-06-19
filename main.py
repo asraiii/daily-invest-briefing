@@ -105,6 +105,7 @@ def send_telegram(message):
 data = get_market_data()
 score = score_market(data)
 
-message = create_message(data, score, "")
+ai_summary = ""
+message = create_message(data, score, ai_summary)
 
 send_telegram(message)
