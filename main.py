@@ -74,28 +74,34 @@ def score_market(data):
 
     score = 0
 
-    sp = abs(data["S&P500"]["drawdown"])
-    nd = abs(data["NASDAQ"]["drawdown"])
+    sp = abs(data.get("S&P500", 0))
+    nd = abs(data.get("NASDAQ", 0))
 
+    # S&P500 기준
     if sp >= 5:
         score += 20
+
     if sp >= 10:
         score += 20
+
     if sp >= 15:
         score += 20
+
     if sp >= 20:
         score += 20
+
     if sp >= 30:
         score += 20
 
-    if nd >= 8:
+    # NASDAQ 보정
+    if nd >= 10:
         score += 10
+
     if nd >= 15:
-        score += 15
+        score += 10
+
     if nd >= 20:
-        score += 15
-    if nd >= 30:
-        score += 20
+        score += 10
 
     return min(score, 100)
 def get_market_comment(data, score):
@@ -159,20 +165,11 @@ def create_message(data, score, ai_summary=""):
         ""
     ]
 
-    if score == 0:
+    if score < 40:
         lines.append("🟢 정기매수만 진행")
 
-    elif score <= 20:
-        lines.append("🟡 약한 추가매수 구간")
-
-    elif score <= 40:
-        lines.append("🟠 분할 추가매수 시작")
-
-    elif score <= 60:
+    elif score < 80:
         lines.append("🔴 적극 추가매수")
-
-    elif score <= 80:
-        lines.append("🚨 강한 추가매수")
 
     else:
         lines.append("🔥 역사적 저점 수준")
