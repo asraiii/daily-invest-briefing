@@ -46,6 +46,8 @@ def get_market_data():
             # 1년 최고점 대비 하락률
             hist_1y = ticker.history(period="1y")
 
+            current_price = 0
+            
             if len(hist_1y) >= 2:
                 current_price = hist_1y["Close"].iloc[-1]
                 high_price = hist_1y["Close"].max()
@@ -59,7 +61,8 @@ def get_market_data():
 
             data[name] = {
                 "daily": round(float(daily_change), 2),
-                "drawdown": round(float(drawdown), 2)
+                "drawdown": round(float(drawdown), 2),
+                "current": round(float(current_price), 2)
             }
 
         except Exception as e:
@@ -67,7 +70,8 @@ def get_market_data():
 
             data[name] = {
                 "daily": 0,
-                "drawdown": 0
+                "drawdown": 0,
+                "current": 0
             }
 
     return data
@@ -83,6 +87,7 @@ def get_market_comment(data):
     sp = abs(data["S&P500"]["drawdown"])
     nd = abs(data["NASDAQ"]["drawdown"])
     vix = data["VIX"]["daily"]
+    usdkrw = data["USDKRW"]["current"]
 
     comments = []
 
@@ -149,7 +154,32 @@ def get_market_comment(data):
         comments.append(
             "VIX가 상승하며 단기 변동성 확대 가능성이 나타나고 있습니다."
         )
+    # 환율 코멘트
 
+    if usdkrw >= 1400:
+
+        comments.append(
+            f"원달러 환율은 {usdkrw:.0f}원 수준으로 높은 편이며 해외자산 매수 시 환율 부담이 존재합니다."
+        )
+
+    elif usdkrw >= 1300:
+
+        comments.append(
+            f"원달러 환율은 {usdkrw:.0f}원 수준으로 다소 높은 구간입니다."
+        )
+
+    elif usdkrw >= 1200:
+
+        comments.append(
+            f"원달러 환율은 {usdkrw:.0f}원 수준으로 평균 범위에 위치하고 있습니다."
+        )
+
+    else:
+
+        comments.append(
+            f"원달러 환율은 {usdkrw:.0f}원 수준으로 비교적 낮은 편이며 달러 자산 매수에 유리한 환경입니다."
+        )
+        
     # 투자 전략
     comments.append("")
     comments.append("장기 투자 관점에서는 VOO, QQQM, SCHD 적립식을 유지하는 전략이 유효합니다.")
@@ -188,31 +218,37 @@ def get_economic_issues():
         model = genai.GenerativeModel("gemini-2.5-flash")
 
         prompt = """
-현재 가장 중요한 국내외 경제 이슈 5개를 작성해줘.
+오늘 기준 가장 중요한 국내외 경제 이슈 5개를 작성해줘.
 
 형식:
 
-1. 이슈 제목
+1. 제목
 영향 : 긍정
+투자영향 : 한줄
 
-2. 이슈 제목
+2. 제목
 영향 : 부정
+투자영향 : 한줄
 
-3. 이슈 제목
+3. 제목
 영향 : 중립
+투자영향 : 한줄
 
-4. 이슈 제목
+4. 제목
 영향 : 긍정
+투자영향 : 한줄
 
-5. 이슈 제목
+5. 제목
 영향 : 부정
+투자영향 : 한줄
 
+설명은 짧게.
 반드시 위 형식만 사용.
 """
 
         response = model.generate_content(prompt)
 
-        return response.text
+        return response.text[:1500]
 
     except Exception as e:
 
@@ -280,6 +316,7 @@ def create_message(
         f"NASDAQ : {data['NASDAQ']['daily']}%",
         f"VIX : {data['VIX']['daily']}%",
         f"USD/KRW : {data['USDKRW']['daily']}%",
+        f"환율 : {round(data['USDKRW']['current'])}원",
         "",
 
         "[최근 1년 최고점 대비]",
