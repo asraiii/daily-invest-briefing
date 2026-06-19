@@ -27,15 +27,16 @@ def get_market_data():
 
             if len(hist) >= 2:
 
-    current_price = hist["Close"].iloc[-1]
-    high_price = hist["Close"].max()
+                current_price = hist["Close"].iloc[-1]
+                high_price = hist["Close"].max()
 
-    drawdown = (
-        (current_price - high_price)
-        / high_price
-    ) * 100
+                drawdown = (
+                    (current_price - high_price)
+                    / high_price
+                ) * 100
 
-    data[name] = round(float(drawdown), 2)
+                data[name] = round(float(drawdown), 2)
+
             else:
                 data[name] = 0.0
 
