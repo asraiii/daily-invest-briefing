@@ -70,42 +70,7 @@ def get_market_data():
 # -----------------------------
 # 2. 간단 점수 시스템
 # -----------------------------
-def score_market(data):
 
-    print(data)
-
-    score = 0
-
-    sp = abs(data["S&P500"]["drawdown"])
-    nd = abs(data["NASDAQ"]["drawdown"])
-
-    # S&P500 기준
-    if sp >= 5:
-        score += 20
-
-    if sp >= 10:
-        score += 20
-
-    if sp >= 15:
-        score += 20
-
-    if sp >= 20:
-        score += 20
-
-    if sp >= 30:
-        score += 20
-
-    # NASDAQ 보정
-    if nd >= 10:
-        score += 10
-
-    if nd >= 15:
-        score += 10
-
-    if nd >= 20:
-        score += 10
-
-    return min(score, 100)
 def get_market_comment(data):
 
     sp = abs(data["S&P500"]["drawdown"])
@@ -183,6 +148,22 @@ def get_market_comment(data):
     comments.append("장기 투자 관점에서는 VOO, QQQM, SCHD 적립식을 유지하는 전략이 유효합니다.")
 
     return "\n".join(comments)
+
+# -----------------------------
+# 투자 신호 생성
+# -----------------------------
+def get_invest_signal(data):
+
+    sp = abs(data["S&P500"]["drawdown"])
+
+    if sp < 10:
+        return "🟢 정기매수"
+
+    elif sp < 20:
+        return "🔴 적극 추가매수"
+
+    else:
+        return "🔥 역사적 저점"
 
 # -----------------------------
 # 3. 브리핑 생성
