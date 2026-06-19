@@ -1,8 +1,12 @@
 import os
 import requests
 import yfinance as yf
+import google.generativeai as genai
 from datetime import datetime
 
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+genai.configure(api_key=GEMINI_API_KEY)
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
@@ -10,6 +14,8 @@ CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 # -----------------------------
 # 1. 시장 데이터 수집
 # -----------------------------
+
+
 def get_market_data():
     tickers = {
         "S&P500": "^GSPC",
@@ -70,6 +76,7 @@ def get_market_data():
 # -----------------------------
 # 2. 간단 점수 시스템
 # -----------------------------
+
 
 def get_market_comment(data):
 
@@ -149,9 +156,12 @@ def get_market_comment(data):
 
     return "\n".join(comments)
 
+
 # -----------------------------
 # 투자 신호 생성
 # -----------------------------
+
+
 def get_invest_signal(data):
 
     sp = abs(data["S&P500"]["drawdown"])
@@ -165,10 +175,99 @@ def get_invest_signal(data):
     else:
         return "🔥 역사적 저점"
 
+
+# -----------------------------
+# 경제 이슈 TOP5
+# -----------------------------
+
+
+def get_economic_issues():
+
+    try:
+
+        model = genai.GenerativeModel("gemini-2.5-flash")
+
+        prompt = """
+현재 가장 중요한 국내외 경제 이슈 5개를 작성해줘.
+
+형식:
+
+1. 이슈 제목
+영향 : 긍정
+
+2. 이슈 제목
+영향 : 부정
+
+3. 이슈 제목
+영향 : 중립
+
+4. 이슈 제목
+영향 : 긍정
+
+5. 이슈 제목
+영향 : 부정
+
+반드시 위 형식만 사용.
+"""
+
+        response = model.generate_content(prompt)
+
+        return response.text
+
+    except Exception as e:
+
+        print("Gemini Error:", e)
+
+        return "경제 이슈를 불러오지 못했습니다."
+
+
+# -----------------------------
+# 종합 판단
+# -----------------------------
+
+
+def get_market_summary(signal, economic_issues):
+
+    positive = economic_issues.count("긍정")
+    negative = economic_issues.count("부정")
+
+    if positive > negative:
+
+        mood = "시장 분위기는 다소 우호적입니다."
+
+    elif negative > positive:
+
+        mood = "시장 분위기는 다소 경계가 필요합니다."
+
+    else:
+
+        mood = "시장 분위기는 중립적입니다."
+
+    summary = f"""
+긍정 이슈 {positive}건, 부정 이슈 {negative}건입니다.
+
+{mood}
+
+현재 투자 신호는 {signal} 상태입니다.
+
+장기 투자자는 VOO·QQQM·SCHD 적립식을 유지하는 전략이 적절합니다.
+"""
+
+    return summary.strip()
+
+
 # -----------------------------
 # 3. 브리핑 생성
 # -----------------------------
-def create_message(data, market_comment, signal):
+
+
+def create_message(
+    data,
+    market_comment,
+    signal,
+    economic_issues,
+    market_summary
+):
 
     now = datetime.now().strftime("%Y-%m-%d")
 
@@ -194,6 +293,14 @@ def create_message(data, market_comment, signal):
         signal,
         "",
 
+        "[주요 경제 이슈 TOP5]",
+        economic_issues,
+        "",
+
+        "[종합 판단]",
+        market_summary,
+        "",
+
         "[시장 해설]",
         market_comment
     ]
@@ -204,6 +311,8 @@ def create_message(data, market_comment, signal):
 # -----------------------------
 # 4. 텔레그램 전송
 # -----------------------------
+
+
 def send_telegram(message):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
@@ -216,16 +325,27 @@ def send_telegram(message):
 # -----------------------------
 # 실행
 # -----------------------------
+
+
 data = get_market_data()
 
 signal = get_invest_signal(data)
 
 market_comment = get_market_comment(data)
 
+economic_issues = get_economic_issues()
+
+market_summary = get_market_summary(
+    signal,
+    economic_issues
+)
+
 message = create_message(
     data,
     market_comment,
-    signal
+    signal,
+    economic_issues,
+    market_summary
 )
 
 send_telegram(message)
