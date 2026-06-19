@@ -53,7 +53,8 @@ def get_market_data():
 
             data[name] = {
                 "daily": round(float(daily_change), 2),
-                "drawdown": round(float(drawdown), 2)
+                "drawdown": round(float(drawdown), 2),
+                "price": round(float(hist_1y["Close"].iloc[-1]), 2)
             }
 
         except Exception as e:
@@ -110,7 +111,7 @@ def get_market_comment(data):
 
     sp = abs(data["S&P500"]["drawdown"])
     nd = abs(data["NASDAQ"]["drawdown"])
-    vix = data["VIX"]["daily"]
+    vix = data["VIX"]["price"]
 
     comments = []
 
@@ -168,15 +169,12 @@ def get_market_comment(data):
         )
 
     # 변동성
-    if vix <= -5:
-        comments.append(
-            "VIX가 크게 하락하며 시장의 공포 심리가 완화되었습니다."
-        )
-
-    elif vix >= 5:
-        comments.append(
-            "VIX가 상승하며 단기 변동성 확대 가능성이 나타나고 있습니다."
-        )
+    if vix >= 25:
+        comments.append("VIX 매우 높음 (공포)")
+    elif vix >= 18:
+        comments.append("VIX 상승 (불안)")
+    else:
+        comments.append("VIX 안정")
 
     # 투자 전략
     comments.append("")
@@ -199,7 +197,7 @@ def create_message(data, market_comment):
         f"S&P500 : {data['S&P500']['daily']}%",
         f"NASDAQ : {data['NASDAQ']['daily']}%",
         f"VIX : {data['VIX']['daily']}%",
-        f"USD/KRW : {data['USDKRW']['daily']}%",
+        f"USD/KRW : {data['USDKRW']['current']}원",
         "",
 
         "[최근 1년 최고점 대비]",
