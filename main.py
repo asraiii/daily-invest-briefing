@@ -8,7 +8,7 @@ CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 
 # -----------------------------
-# 1. 시장 데이터 수집
+# 1. 시장 데이터 수집 (안정 버전)
 # -----------------------------
 def get_market_data():
     tickers = {
@@ -22,196 +22,115 @@ def get_market_data():
 
     for name, symbol in tickers.items():
         try:
-            ticker = yf.Ticker(symbol)
+            t = yf.Ticker(symbol)
+
+            hist_5d = t.history(period="5d")
+            hist_1y = t.history(period="1y")
+
+            if hist_5d.empty or hist_1y.empty:
+                raise ValueError("No data")
 
             # 오늘 등락률
-            hist_5d = ticker.history(period="5d")
-
             if len(hist_5d) >= 2:
-                close = hist_5d["Close"].tail(2).values
-
-                daily_change = (
-                    (close[-1] - close[-2])
-                    / close[-2]
-                ) * 100
+                close = hist_5d["Close"].dropna().values
+                daily = (close[-1] - close[-2]) / close[-2] * 100
             else:
-                daily_change = 0
+                daily = 0
 
-            # 1년 최고점 대비 하락률
-            hist_1y = ticker.history(period="1y")
+            # 현재가
+            current = hist_1y["Close"].dropna().iloc[-1]
 
-            if len(hist_1y) >= 2:
-                current_price = hist_1y["Close"].iloc[-1]
-                high_price = hist_1y["Close"].max()
-
-                drawdown = (
-                    (current_price - high_price)
-                    / high_price
-                ) * 100
-            else:
-                drawdown = 0
+            # 1년 최고 대비
+            high = hist_1y["Close"].dropna().max()
+            drawdown = (current - high) / high * 100
 
             data[name] = {
-                "daily": round(float(daily_change), 2),
+                "daily": round(float(daily), 2),
                 "drawdown": round(float(drawdown), 2),
-                "price": round(float(hist_1y["Close"].iloc[-1]), 2)
+                "current": round(float(current), 2)
             }
 
         except Exception as e:
-            print(f"{name} error:", e)
+            print(name, "error:", e)
 
             data[name] = {
                 "daily": 0,
-                "drawdown": 0
+                "drawdown": 0,
+                "current": 0
             }
 
     return data
 
 
 # -----------------------------
-# 2. 간단 점수 시스템
+# 2. 시장 해설
 # -----------------------------
-def score_market(data):
-
-    print(data)
-
-    score = 0
-
-    sp = abs(data["S&P500"]["drawdown"])
-    nd = abs(data["NASDAQ"]["drawdown"])
-
-    # S&P500 기준
-    if sp >= 5:
-        score += 20
-
-    if sp >= 10:
-        score += 20
-
-    if sp >= 15:
-        score += 20
-
-    if sp >= 20:
-        score += 20
-
-    if sp >= 30:
-        score += 20
-
-    # NASDAQ 보정
-    if nd >= 10:
-        score += 10
-
-    if nd >= 15:
-        score += 10
-
-    if nd >= 20:
-        score += 10
-
-    return min(score, 100)
 def get_market_comment(data):
 
     sp = abs(data["S&P500"]["drawdown"])
     nd = abs(data["NASDAQ"]["drawdown"])
-    vix = data["VIX"]["price"]
+    vix = data["VIX"]["daily"]
+    usdkrw = data["USDKRW"]["current"]
 
     comments = []
 
-    # 시장 위치
+    # S&P500 상태
     if sp < 5:
-
-        comments.append(
-            f"S&P500은 최근 1년 최고점 대비 {sp:.1f}% 하락에 불과하며 사실상 신고가 부근입니다."
-        )
-
-        comments.append(
-            f"NASDAQ100도 최고점 대비 {nd:.1f}% 하락 수준으로 성장주 강세 흐름이 유지되고 있습니다."
-        )
-
-        comments.append(
-            "시장은 낙관적인 분위기가 우세하며 투자심리가 안정적인 상태입니다."
-        )
-
+        comments.append("S&P500: 신고가 근처")
     elif sp < 10:
-
-        comments.append(
-            f"S&P500은 최고점 대비 {sp:.1f}% 하락한 상태입니다."
-        )
-
-        comments.append(
-            "정상적인 조정 범위로 볼 수 있으며 장기 상승 추세는 아직 유지되고 있습니다."
-        )
-
+        comments.append("S&P500: 소폭 조정")
     elif sp < 20:
-
-        comments.append(
-            f"S&P500은 최고점 대비 {sp:.1f}% 하락했습니다."
-        )
-
-        comments.append(
-            "과거 기준으로 의미 있는 조정 구간에 진입한 상태입니다."
-        )
-
-        comments.append(
-            "장기 투자자라면 추가 자금을 분할 투입하기 시작할 수 있는 구간입니다."
-        )
-
+        comments.append("S&P500: 의미 있는 조정")
     else:
+        comments.append("S&P500: 큰 조정")
 
-        comments.append(
-            f"S&P500은 최고점 대비 {sp:.1f}% 하락했습니다."
-        )
-
-        comments.append(
-            "역사적으로 드물게 나타나는 큰 폭의 조정 구간입니다."
-        )
-
-        comments.append(
-            "장기 투자자에게는 적극적인 매수 기회가 될 수 있습니다."
-        )
-
-    # 변동성
-    if vix >= 25:
-        comments.append("VIX 매우 높음 (공포)")
-    elif vix >= 18:
-        comments.append("VIX 상승 (불안)")
+    # NASDAQ
+    if nd < 5:
+        comments.append("NASDAQ: 강세 유지")
+    elif nd < 15:
+        comments.append("NASDAQ: 조정 구간")
     else:
-        comments.append("VIX 안정")
+        comments.append("NASDAQ: 변동성 확대")
 
-    # 투자 전략
-    comments.append("")
-    comments.append("장기 투자 관점에서는 VOO, QQQM, SCHD 적립식을 유지하는 전략이 유효합니다.")
+    # VIX
+    if vix > 10:
+        comments.append("VIX: 변동성 확대")
+    elif vix < -5:
+        comments.append("VIX: 공포 완화")
+
+    # 환율
+    if usdkrw >= 1400:
+        comments.append(f"환율: {usdkrw:.0f}원 (높은 수준)")
+    else:
+        comments.append(f"환율: {usdkrw:.0f}원")
 
     return "\n".join(comments)
 
+
 # -----------------------------
-# 3. 브리핑 생성
+# 3. 메시지 생성 (최종 포맷)
 # -----------------------------
-def create_message(data, market_comment):
+def create_message(data, comment):
 
     now = datetime.now().strftime("%Y-%m-%d")
 
-    lines = [
-        f"📊 투자 브리핑 ({now})",
-        "",
+    return f"""📊 투자 브리핑 ({now})
 
-        "[오늘 시장 등락]",
-        f"S&P500 : {data['S&P500']['daily']}%",
-        f"NASDAQ : {data['NASDAQ']['daily']}%",
-        f"VIX : {data['VIX']['daily']}%",
-        f"USD/KRW : {data['USDKRW']['current']}원",
-        "",
+[시장]
+S&P500: {data['S&P500']['daily']}%
+NASDAQ: {data['NASDAQ']['daily']}%
+VIX: {data['VIX']['daily']}%
+USD/KRW: {data['USDKRW']['current']}원
 
-        "[최근 1년 최고점 대비]",
-        f"S&P500 : {data['S&P500']['drawdown']}%",
-        f"NASDAQ : {data['NASDAQ']['drawdown']}%",
-        f"VIX : {data['VIX']['drawdown']}%",
-        f"USD/KRW : {data['USDKRW']['drawdown']}%",
-        "",
+[최근 최고점 대비]
+S&P500: {data['S&P500']['drawdown']}%
+NASDAQ: {data['NASDAQ']['drawdown']}%
+VIX: {data['VIX']['drawdown']}%
+USD/KRW: {data['USDKRW']['drawdown']}%
 
-        "[시장 해설]",
-        market_comment
-    ]
-
-    return "\n".join(lines)
+[시장 해설]
+{comment}
+"""
 
 
 # -----------------------------
@@ -230,12 +149,7 @@ def send_telegram(message):
 # 실행
 # -----------------------------
 data = get_market_data()
-
-market_comment = get_market_comment(data)
-
-message = create_message(
-    data,
-    market_comment
-)
+comment = get_market_comment(data)
+message = create_message(data, comment)
 
 send_telegram(message)
