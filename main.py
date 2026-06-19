@@ -5,7 +5,7 @@ import google.generativeai as genai
 from datetime import datetime
 
 # -----------------------------
-# API
+# API 설정
 # -----------------------------
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -13,9 +13,8 @@ CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 genai.configure(api_key=GEMINI_API_KEY)
 
-
 # -----------------------------
-# 시장 데이터
+# 1. 시장 데이터
 # -----------------------------
 def get_market_data():
     tickers = {
@@ -30,26 +29,29 @@ def get_market_data():
 
     for name, symbol in tickers.items():
         try:
-            t = yf.Ticker(symbol)
+            ticker = yf.Ticker(symbol)
 
-            h5 = t.history(period="5d")
-            h1 = t.history(period="1y")
-
-            # 일간 변화
-            if len(h5) >= 2:
-                close = h5["Close"].tail(2).values
-                daily = (close[-1] - close[-2]) / close[-2] * 100
+            hist_5d = ticker.history(period="5d")
+            if len(hist_5d) >= 2:
+                close = hist_5d["Close"].tail(2).values
+                daily_change = (close[-1] - close[-2]) / close[-2] * 100
             else:
-                daily = 0
+                daily_change = 0
 
-            current = h1["Close"].dropna().iloc[-1]
-            high = h1["Close"].max()
-            drawdown = (current - high) / high * 100
+            hist_1y = ticker.history(period="1y")
+
+            if len(hist_1y) > 0:
+                current_price = hist_1y["Close"].dropna().iloc[-1]
+                high_price = hist_1y["Close"].max()
+                drawdown = (current_price - high_price) / high_price * 100
+            else:
+                current_price = 0
+                drawdown = 0
 
             data[name] = {
-                "daily": round(float(daily), 2),
-                "drawdown": round(float(drawdown), 2),
-                "current": round(float(current), 2)
+                "daily": round(daily_change, 2),
+                "drawdown": round(drawdown, 2),
+                "current": round(current_price, 2)
             }
 
         except:
@@ -59,7 +61,7 @@ def get_market_data():
 
 
 # -----------------------------
-# Fear & Greed
+# 2. Fear & Greed (안정 버전)
 # -----------------------------
 def get_fear_greed():
     try:
@@ -67,18 +69,17 @@ def get_fear_greed():
         r = requests.get(url, timeout=10)
         r.raise_for_status()
 
-        score = r.json()["fear_and_greed"]["score"]
-        return int(score), "정상"
+        score = int(r.json()["fear_and_greed"]["score"])
+        return score, "정상"
 
     except:
         return 50, "중립"
 
 
 # -----------------------------
-# 투자 신호
+# 3. 투자 신호
 # -----------------------------
 def get_invest_signal(data, fear_score):
-
     sp = abs(data["S&P500"]["drawdown"])
 
     if sp >= 25 or fear_score <= 20:
@@ -90,140 +91,132 @@ def get_invest_signal(data, fear_score):
 
 
 # -----------------------------
-# 시장 해설 (간단)
+# 4. 시장 코멘트 (정리됨)
 # -----------------------------
-def get_market_comment(data, fear_score, fear_status):
+def get_market_comment(data, fear_score):
 
     sp = abs(data["S&P500"]["drawdown"])
     vix = data["VIX"]["current"]
-    usd = data["USDKRW"]["current"]
+    usdkrw = data["USDKRW"]["current"]
 
-    lines = []
+    comments = []
 
-    lines.append(f"Fear & Greed {fear_score} ({fear_status})")
+    comments.append(f"Fear & Greed: {fear_score}")
 
-    # S&P
     if sp < 5:
-        lines.append(f"S&P500 신고가 근처 (-{sp:.1f}%)")
+        comments.append("S&P500: 신고가 근처")
     elif sp < 10:
-        lines.append(f"S&P500 소폭 조정 (-{sp:.1f}%)")
+        comments.append("S&P500: 소폭 조정")
     elif sp < 20:
-        lines.append(f"S&P500 조정 구간 (-{sp:.1f}%)")
+        comments.append("S&P500: 조정 구간")
     else:
-        lines.append(f"S&P500 큰 조정 (-{sp:.1f}%)")
+        comments.append("S&P500: 큰 조정")
 
-    # VIX
     if vix >= 25:
-        lines.append("변동성 매우 높음")
+        comments.append("변동성 높음")
     elif vix >= 18:
-        lines.append("변동성 상승")
+        comments.append("변동성 상승")
     else:
-        lines.append("변동성 안정")
+        comments.append("변동성 안정")
 
-    # 환율
-    lines.append(f"환율 {usd:.0f}원")
+    if usdkrw >= 1400:
+        comments.append(f"환율 {usdkrw:.0f} (높음)")
+    else:
+        comments.append(f"환율 {usdkrw:.0f}")
+
+    return "\n".join(comments)
+
+
+# -----------------------------
+# 5. 경제 이슈 (절대 안 끊기게 수정)
+# -----------------------------
+def get_economic_issues():
+    try:
+        model = genai.GenerativeModel("gemini-2.5-flash")
+
+        prompt = """
+최근 24시간 경제/금융 이슈 3개.
+
+각각 반드시 아래 형식 유지:
+
+1. 제목
+핵심:
+영향:
+
+2. 제목
+핵심:
+영향:
+
+3. 제목
+핵심:
+영향:
+
+짧고 끊지 말고 반드시 3개 모두 작성
+"""
+
+        response = model.generate_content(
+            prompt,
+            generation_config={
+                "temperature": 0.3,
+                "max_output_tokens": 800
+            }
+        )
+
+        text = response.text.strip()
+
+        # 안전장치 (끊김 방지)
+        if len(text) < 50:
+            return "이슈 생성 실패"
+
+        return text
+
+    except:
+        return "이슈 생성 실패"
+
+
+# -----------------------------
+# 6. 메시지 생성 (완전 정리)
+# -----------------------------
+def create_message(data, fear_score, fear_status, signal, issues):
+
+    now = datetime.now().strftime("%Y-%m-%d")
+
+    lines = [
+        f"📊 투자 브리핑 ({now})",
+        "",
+        "[시장]",
+        f"S&P500: {data['S&P500']['daily']}%",
+        f"NASDAQ: {data['NASDAQ']['daily']}%",
+        f"SCHD: {data['SCHD']['daily']}%",
+        f"VIX: {data['VIX']['daily']}%",
+        f"USD/KRW: {data['USDKRW']['current']}원",
+        "",
+        f"Fear & Greed: {fear_score} ({fear_status})",
+        "",
+        "[최근 최고점 대비]",
+        f"S&P500: {data['S&P500']['drawdown']}%",
+        f"NASDAQ: {data['NASDAQ']['drawdown']}%",
+        f"SCHD: {data['SCHD']['drawdown']}%",
+        "",
+        "[신호]",
+        signal,
+        "",
+        "[이슈]",
+        issues
+    ]
 
     return "\n".join(lines)
 
 
 # -----------------------------
-# 경제 이슈 (수정 핵심)
+# 7. 텔레그램 전송
 # -----------------------------
-def get_economic_issues():
-
-    try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
-
-        prompt = """
-최근 24시간 경제/금융 이슈 3개만 매우 짧게:
-
-1. 제목
-무슨 일:
-시장영향:
-
-2. 제목
-무슨 일:
-시장영향:
-
-3. 제목
-무슨 일:
-시장영향:
-"""
-
-        res = model.generate_content(
-            prompt,
-            generation_config={
-                "temperature": 0.3,
-                "max_output_tokens": 600
-            }
-        )
-
-        return res.text.strip()
-
-    except Exception as e:
-        print("Gemini error:", e)
-        return "경제 이슈 데이터 없음"
-
-
-# -----------------------------
-# 종합 판단
-# -----------------------------
-def get_market_summary(signal, fear_score, fear_status, data):
-
-    sp = abs(data["S&P500"]["drawdown"])
-
-    return f"""
-Fear & Greed: {fear_score} ({fear_status})
-S&P500: -{sp:.1f}%
-
-신호: {signal}
-""".strip()
-
-
-# -----------------------------
-# 메시지 생성 (깔끔 버전)
-# -----------------------------
-def create_message(data, signal, news, summary, fear_score, fear_status):
-
-    now = datetime.now().strftime("%Y-%m-%d")
-
-    return f"""
-📊 투자 브리핑 ({now})
-
-[시장]
-S&P500: {data['S&P500']['daily']}%
-NASDAQ: {data['NASDAQ']['daily']}%
-SCHD: {data['SCHD']['daily']}%
-VIX: {data['VIX']['daily']}%
-USD/KRW: {data['USDKRW']['current']}원
-
-Fear & Greed: {fear_score} ({fear_status})
-
-[최근 최고점 대비]
-S&P500: {data['S&P500']['drawdown']}%
-NASDAQ: {data['NASDAQ']['drawdown']}%
-SCHD: {data['SCHD']['drawdown']}%
-
-[신호]
-{signal}
-
-[이슈]
-{news}
-
-[요약]
-{summary}
-""".strip()
-
-
-# -----------------------------
-# 텔레그램
-# -----------------------------
-def send_telegram(msg):
+def send_telegram(message):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
     requests.post(url, json={
         "chat_id": CHAT_ID,
-        "text": msg
+        "text": message
     })
 
 
@@ -232,11 +225,9 @@ def send_telegram(msg):
 # -----------------------------
 data = get_market_data()
 fear_score, fear_status = get_fear_greed()
-
 signal = get_invest_signal(data, fear_score)
-news = get_economic_issues()
-summary = get_market_summary(signal, fear_score, fear_status, data)
+issues = get_economic_issues()
 
-msg = create_message(data, signal, news, summary, fear_score, fear_status)
+message = create_message(data, fear_score, fear_status, signal, issues)
 
-send_telegram(msg)
+send_telegram(message)
