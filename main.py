@@ -1,142 +1,243 @@
 import os
 import requests
 import yfinance as yf
-import google.generativeai as genai
 from datetime import datetime
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-genai.configure(api_key=GEMINI_API_KEY)
 
-
-# =========================
-# 1. 시장 데이터
-# =========================
+# -----------------------------
+# 1. 시장 데이터 수집
+# -----------------------------
 def get_market_data():
     tickers = {
         "S&P500": "^GSPC",
         "NASDAQ": "^NDX",
         "VIX": "^VIX",
-        "USDKRW": "KRW=X",
+        "USDKRW": "KRW=X"
     }
 
     data = {}
 
     for name, symbol in tickers.items():
         try:
-            t = yf.Ticker(symbol)
+            ticker = yf.Ticker(symbol)
 
-            h5 = t.history(period="5d")
-            h1 = t.history(period="1y")
+            # 오늘 등락률
+            hist_5d = ticker.history(period="5d")
 
-            # daily
-            if len(h5) >= 2:
-                c = h5["Close"].dropna().values
-                daily = (c[-1] - c[-2]) / c[-2] * 100
+            if len(hist_5d) >= 2:
+                close = hist_5d["Close"].tail(2).values
+
+                daily_change = (
+                    (close[-1] - close[-2])
+                    / close[-2]
+                ) * 100
             else:
-                daily = 0
+                daily_change = 0
 
-            # drawdown
-            if len(h1) > 0:
-                current = h1["Close"].dropna().iloc[-1]
-                high = h1["Close"].max()
-                drawdown = (current - high) / high * 100
+            # 1년 최고점 대비 하락률
+            hist_1y = ticker.history(period="1y")
+
+            if len(hist_1y) >= 2:
+                current_price = hist_1y["Close"].iloc[-1]
+                high_price = hist_1y["Close"].max()
+
+                drawdown = (
+                    (current_price - high_price)
+                    / high_price
+                ) * 100
             else:
-                current = 0
                 drawdown = 0
 
             data[name] = {
-                "daily": round(float(daily), 2),
-                "drawdown": round(float(drawdown), 2),
-                "current": round(float(current), 2),
+                "daily": round(float(daily_change), 2),
+                "drawdown": round(float(drawdown), 2)
             }
 
-        except:
-            data[name] = {"daily": 0, "drawdown": 0, "current": 0}
+        except Exception as e:
+            print(f"{name} error:", e)
+
+            data[name] = {
+                "daily": 0,
+                "drawdown": 0
+            }
 
     return data
 
 
-# =========================
-# 2. Fear & Greed
-# =========================
-def get_fear_greed():
-    try:
-        url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
-        r = requests.get(url, timeout=10)
-        r.raise_for_status()
+# -----------------------------
+# 2. 간단 점수 시스템
+# -----------------------------
+def score_market(data):
 
-        score = r.json()["fear_and_greed"]["score"]
-        return int(score), "정상"
+    print(data)
 
-    except:
-        return 50, "중립"
-
-
-# =========================
-# 3. 투자 신호
-# =========================
-def get_signal(data, fear):
-    sp = abs(data["S&P500"]["drawdown"])
-
-    if sp >= 25 or fear <= 20:
-        return "🔴 공격매수"
-    elif sp >= 10 or fear <= 40:
-        return "🟡 적극매수"
-    else:
-        return "🟢 정기매수"
-
-
-# =========================
-# 4. 메시지 생성 (핵심만)
-# =========================
-def build_message(data, fear, status, signal):
-
-    now = datetime.now().strftime("%Y-%m-%d")
+    score = 0
 
     sp = abs(data["S&P500"]["drawdown"])
     nd = abs(data["NASDAQ"]["drawdown"])
 
-    msg = f"""📊 투자 브리핑 ({now})
+    # S&P500 기준
+    if sp >= 5:
+        score += 20
 
-[시장]
-S&P500: {data['S&P500']['daily']}%
-NASDAQ: {data['NASDAQ']['daily']}%
-VIX: {data['VIX']['daily']}%
-USD/KRW: {data['USDKRW']['current']}원
+    if sp >= 10:
+        score += 20
 
-[최근 최고점 대비]
-S&P500: {data['S&P500']['drawdown']}%
-NASDAQ: {data['NASDAQ']['drawdown']}%
+    if sp >= 15:
+        score += 20
 
-[투자 신호]
-{signal}
+    if sp >= 20:
+        score += 20
 
-[요약]
-S&P500: -{sp:.1f}%
-NASDAQ: -{nd:.1f}%
-신호: {signal}
-"""
+    if sp >= 30:
+        score += 20
 
-    return msg
+    # NASDAQ 보정
+    if nd >= 10:
+        score += 10
+
+    if nd >= 15:
+        score += 10
+
+    if nd >= 20:
+        score += 10
+
+    return min(score, 100)
+def get_market_comment(data):
+
+    sp = abs(data["S&P500"]["drawdown"])
+    nd = abs(data["NASDAQ"]["drawdown"])
+    vix = data["VIX"]["daily"]
+
+    comments = []
+
+    # 시장 위치
+    if sp < 5:
+
+        comments.append(
+            f"S&P500은 최근 1년 최고점 대비 {sp:.1f}% 하락에 불과하며 사실상 신고가 부근입니다."
+        )
+
+        comments.append(
+            f"NASDAQ100도 최고점 대비 {nd:.1f}% 하락 수준으로 성장주 강세 흐름이 유지되고 있습니다."
+        )
+
+        comments.append(
+            "시장은 낙관적인 분위기가 우세하며 투자심리가 안정적인 상태입니다."
+        )
+
+    elif sp < 10:
+
+        comments.append(
+            f"S&P500은 최고점 대비 {sp:.1f}% 하락한 상태입니다."
+        )
+
+        comments.append(
+            "정상적인 조정 범위로 볼 수 있으며 장기 상승 추세는 아직 유지되고 있습니다."
+        )
+
+    elif sp < 20:
+
+        comments.append(
+            f"S&P500은 최고점 대비 {sp:.1f}% 하락했습니다."
+        )
+
+        comments.append(
+            "과거 기준으로 의미 있는 조정 구간에 진입한 상태입니다."
+        )
+
+        comments.append(
+            "장기 투자자라면 추가 자금을 분할 투입하기 시작할 수 있는 구간입니다."
+        )
+
+    else:
+
+        comments.append(
+            f"S&P500은 최고점 대비 {sp:.1f}% 하락했습니다."
+        )
+
+        comments.append(
+            "역사적으로 드물게 나타나는 큰 폭의 조정 구간입니다."
+        )
+
+        comments.append(
+            "장기 투자자에게는 적극적인 매수 기회가 될 수 있습니다."
+        )
+
+    # 변동성
+    if vix <= -5:
+        comments.append(
+            "VIX가 크게 하락하며 시장의 공포 심리가 완화되었습니다."
+        )
+
+    elif vix >= 5:
+        comments.append(
+            "VIX가 상승하며 단기 변동성 확대 가능성이 나타나고 있습니다."
+        )
+
+    # 투자 전략
+    comments.append("")
+    comments.append("장기 투자 관점에서는 VOO, QQQM, SCHD 적립식을 유지하는 전략이 유효합니다.")
+
+    return "\n".join(comments)
+
+# -----------------------------
+# 3. 브리핑 생성
+# -----------------------------
+def create_message(data, market_comment):
+
+    now = datetime.now().strftime("%Y-%m-%d")
+
+    lines = [
+        f"📊 투자 브리핑 ({now})",
+        "",
+
+        "[오늘 시장 등락]",
+        f"S&P500 : {data['S&P500']['daily']}%",
+        f"NASDAQ : {data['NASDAQ']['daily']}%",
+        f"VIX : {data['VIX']['daily']}%",
+        f"USD/KRW : {data['USDKRW']['daily']}%",
+        "",
+
+        "[최근 1년 최고점 대비]",
+        f"S&P500 : {data['S&P500']['drawdown']}%",
+        f"NASDAQ : {data['NASDAQ']['drawdown']}%",
+        f"VIX : {data['VIX']['drawdown']}%",
+        f"USD/KRW : {data['USDKRW']['drawdown']}%",
+        "",
+
+        "[시장 해설]",
+        market_comment
+    ]
+
+    return "\n".join(lines)
 
 
-# =========================
-# 5. 텔레그램 전송
-# =========================
-def send(msg):
+# -----------------------------
+# 4. 텔레그램 전송
+# -----------------------------
+def send_telegram(message):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    requests.post(url, json={"chat_id": CHAT_ID, "text": msg})
+
+    requests.post(url, json={
+        "chat_id": CHAT_ID,
+        "text": message
+    })
 
 
-# =========================
+# -----------------------------
 # 실행
-# =========================
+# -----------------------------
 data = get_market_data()
-fear, status = get_fear_greed()
-signal = get_signal(data, fear)
 
-message = build_message(data, fear, status, signal)
-send(message)
+market_comment = get_market_comment(data)
+
+message = create_message(
+    data,
+    market_comment
+)
+
+send_telegram(message)
