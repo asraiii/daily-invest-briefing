@@ -58,29 +58,39 @@ def score_market(data):
 def create_message(data, score):
     now = datetime.now().strftime("%Y-%m-%d")
 
-    message = []
-    message.append(f"📊 투자 브리핑 ({now})\n")
-
-    message.append("[시장 변화]")
-    message.append(f"S&P500: {data.get('S&P500')}%")
-    message.append(f"NASDAQ: {data.get('NASDAQ')}%")
-    message.append(f"VIX: {data.get('VIX')}%")
-    message.append(f"USD/KRW: {data.get('USDKRW')}%\n")
-
-    message.append("[추가매수 점수]")
-    message.append(f"전체 점수: {score}/100\n")
+    lines = [
+        f"📊 투자 브리핑 ({now})",
+        "",
+        "[시장 변화]",
+        f"S&P500: {data.get('S&P500')}%",
+        f"NASDAQ: {data.get('NASDAQ')}%",
+        f"VIX: {data.get('VIX')}%",
+        f"USD/KRW: {data.get('USDKRW')}%",
+        "",
+        "[추가매수 점수]",
+        f"전체 점수: {score}/100",
+        ""
+    ]
 
     if score < 55:
-        message.append("🟢 정기 적립 유지")
+        lines.append("🟢 정기 적립 유지")
     elif score < 70:
-        message.append("🟡 관심 구간")
+        lines.append("🟡 관심 구간")
     else:
-        message.append("🔴 추가매수 고려")
+        lines.append("🔴 추가매수 고려")
 
-    message.append("\n[포트폴리오]")
-    message.append("- VOO / QQQM / SCHD / TIGER ETF")
+    lines += [
+        "",
+        "[포트폴리오]",
+        "• VOO",
+        "• QQQM",
+        "• SCHD",
+        "• TIGER S&P500",
+        "• TIGER 나스닥100",
+        "• TIGER 배당/고배당 ETF"
+    ]
 
-    return "\n".join(message)
+    return "\n".join(lines)
 
 
 # -----------------------------
