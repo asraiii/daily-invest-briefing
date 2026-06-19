@@ -55,30 +55,34 @@ def score_market(data):
 # -----------------------------
 # 3. 브리핑 생성
 # -----------------------------
-def create_message(data, score):
+def create_message(data, score, ai_summary=""):
     now = datetime.now().strftime("%Y-%m-%d")
 
     lines = [
         f"📊 투자 브리핑 ({now})",
         "",
-        "[시장 변화]",
+        "[시장 상태]",
         f"S&P500: {data.get('S&P500')}%",
         f"NASDAQ: {data.get('NASDAQ')}%",
         f"VIX: {data.get('VIX')}%",
         f"USD/KRW: {data.get('USDKRW')}%",
         "",
+        "[핵심 이슈]",
+        ai_summary if ai_summary else "데이터 수집 중...",
+        "",
         "[추가매수 점수]",
-        f"전체 점수: {score}/100",
+        f"{score}/100",
         ""
     ]
 
     if score < 55:
-        lines.append("🟢 정기 적립 유지")
+        lines.append("🟢 정기매수 유지")
     elif score < 70:
-        lines.append("🟡 관심 구간")
+        lines.append("🟡 관망")
+    elif score < 85:
+        lines.append("🔴 분할매수")
     else:
-        lines.append("🔴 추가매수 고려")
-
+        lines.append("🚨 적극 매수")
 
     return "\n".join(lines)
 
@@ -100,6 +104,7 @@ def send_telegram(message):
 # -----------------------------
 data = get_market_data()
 score = score_market(data)
-message = create_message(data, score)
+
+message = create_message(data, score, "")
 
 send_telegram(message)
