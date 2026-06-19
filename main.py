@@ -110,107 +110,108 @@ def get_market_comment(data):
 
     sp = abs(data["S&P500"]["drawdown"])
     nd = abs(data["NASDAQ"]["drawdown"])
+    vix = data["VIX"]["daily"]
 
     comments = []
 
-    if sp < 10:
+    # 시장 위치
+    if sp < 5:
 
         comments.append(
-            f"현재 S&P500은 최근 1년 최고점 대비 {sp:.1f}% 하락한 수준으로, 사실상 신고가 부근에 위치해 있습니다."
+            f"S&P500은 최근 1년 최고점 대비 {sp:.1f}% 하락에 불과하며 사실상 신고가 부근입니다."
         )
 
         comments.append(
-            f"NASDAQ100 역시 최고점 대비 {nd:.1f}% 하락에 불과해 성장주 투자심리는 여전히 양호한 상태입니다."
+            f"NASDAQ100도 최고점 대비 {nd:.1f}% 하락 수준으로 성장주 강세 흐름이 유지되고 있습니다."
         )
 
         comments.append(
-            "현재 구간은 공격적인 현금 투입보다 정기 적립식 매수를 유지하는 것이 유리합니다."
+            "시장은 낙관적인 분위기가 우세하며 투자심리가 안정적인 상태입니다."
+        )
+
+    elif sp < 10:
+
+        comments.append(
+            f"S&P500은 최고점 대비 {sp:.1f}% 하락한 상태입니다."
+        )
+
+        comments.append(
+            "정상적인 조정 범위로 볼 수 있으며 장기 상승 추세는 아직 유지되고 있습니다."
         )
 
     elif sp < 20:
 
         comments.append(
-            f"S&P500은 최근 1년 최고점 대비 {sp:.1f}% 하락했습니다."
+            f"S&P500은 최고점 대비 {sp:.1f}% 하락했습니다."
         )
 
         comments.append(
-            "과거 기준으로 의미 있는 조정 구간에 진입했습니다."
+            "과거 기준으로 의미 있는 조정 구간에 진입한 상태입니다."
         )
 
         comments.append(
-            "정기매수를 유지하면서 여유 현금을 일부 투입하는 전략이 유효합니다."
+            "장기 투자자라면 추가 자금을 분할 투입하기 시작할 수 있는 구간입니다."
         )
 
     else:
 
         comments.append(
-            f"S&P500은 최근 1년 최고점 대비 {sp:.1f}% 하락했습니다."
+            f"S&P500은 최고점 대비 {sp:.1f}% 하락했습니다."
         )
 
         comments.append(
-            "과거 데이터 기준으로 드문 수준의 조정이 진행되고 있습니다."
+            "역사적으로 드물게 나타나는 큰 폭의 조정 구간입니다."
         )
 
         comments.append(
-            "장기 투자자에게는 적극적인 추가매수를 고려할 수 있는 구간입니다."
+            "장기 투자자에게는 적극적인 매수 기회가 될 수 있습니다."
         )
+
+    # 변동성
+    if vix <= -5:
+        comments.append(
+            "VIX가 크게 하락하며 시장의 공포 심리가 완화되었습니다."
+        )
+
+    elif vix >= 5:
+        comments.append(
+            "VIX가 상승하며 단기 변동성 확대 가능성이 나타나고 있습니다."
+        )
+
+    # 투자 전략
+    comments.append("")
+    comments.append("장기 투자 관점에서는 VOO, QQQM, SCHD 적립식을 유지하는 전략이 유효합니다.")
 
     return "\n".join(comments)
 
 # -----------------------------
 # 3. 브리핑 생성
 # -----------------------------
-def create_message(data, score, ai_summary=""):
+def create_message(data, market_comment):
+
     now = datetime.now().strftime("%Y-%m-%d")
 
     lines = [
         f"📊 투자 브리핑 ({now})",
         "",
-        
+
         "[오늘 시장 등락]",
-        f"S&P500: {data['S&P500']['daily']}%",
-        f"NASDAQ: {data['NASDAQ']['daily']}%",
-        f"VIX: {data['VIX']['daily']}%",
-        f"USD/KRW: {data['USDKRW']['daily']}%",
+        f"S&P500 : {data['S&P500']['daily']}%",
+        f"NASDAQ : {data['NASDAQ']['daily']}%",
+        f"VIX : {data['VIX']['daily']}%",
+        f"USD/KRW : {data['USDKRW']['daily']}%",
         "",
 
         "[최근 1년 최고점 대비]",
-        f"S&P500: {data['S&P500']['drawdown']}%",
-        f"NASDAQ: {data['NASDAQ']['drawdown']}%",
-        f"VIX: {data['VIX']['drawdown']}%",
-        f"USD/KRW: {data['USDKRW']['drawdown']}%",
+        f"S&P500 : {data['S&P500']['drawdown']}%",
+        f"NASDAQ : {data['NASDAQ']['drawdown']}%",
+        f"VIX : {data['VIX']['drawdown']}%",
+        f"USD/KRW : {data['USDKRW']['drawdown']}%",
         "",
-        
-        
-        "[핵심 이슈]",
-        ai_summary if ai_summary else "데이터 수집 중...",
-        "",
-        
-        "[투자 신호]",
-        signal,
-        ""
-        "[시장 해]",
-        ai_summary
+
+        "[시장 해설]",
+        market_comment
     ]
-
-    if score < 30:
-        lines.append("🟢 정기매수")
-
-    elif score < 80:
-        lines.append("🔴 적극 추가매수")
-
-    else:
-        lines.append("🔥 역사적 저점")
-
-    
-    if score >= 60:
-        lines.extend([
-            "",
-            "[추천 비율]",
-            "QQQM 40%",
-            "VOO 40%",
-            "SCHD 20%"
-        ])
 
     return "\n".join(lines)
 
@@ -231,9 +232,12 @@ def send_telegram(message):
 # 실행
 # -----------------------------
 data = get_market_data()
-score = score_market(data)
-ai_summary = get_market_comment(data, score)
 
-message = create_message(data, score, ai_summary)
+market_comment = get_market_comment(data)
+
+message = create_message(
+    data,
+    market_comment
+)
 
 send_telegram(message)
