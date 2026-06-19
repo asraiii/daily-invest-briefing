@@ -2,14 +2,10 @@ import os
 import requests
 import yfinance as yf
 from datetime import datetime
-import google.generativeai as genai
 
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-os.environ["GEMINI_API_KEY"]
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
-model = genai.GenerativeModel("gemini-2.0-flash")
 
 # -----------------------------
 # 1. 시장 데이터 수집
@@ -49,33 +45,34 @@ def get_market_data():
 def score_market(data):
     score = 50
 
-    score += data.get("S&P500", 0) * 2
-    score += data.get("NASDAQ", 0) * 3
-    score -= data.get("VIX", 0) * 1.5
+    score += data.get("S&P500", 0) * 1
+    score += data.get("NASDAQ", 0) * 1.5
+    score -= data.get("VIX", 0) * 0.5
 
     return max(0, min(100, round(score, 1)))
 
-def get_ai_summary(data, score):
-    try:
-        prompt = f"""
-너는 투자 애널리스트다.
+def get_market_comment(data, score):
 
-S&P500: {data.get('S&P500')}
-NASDAQ: {data.get('NASDAQ')}
-VIX: {data.get('VIX')}
-USD/KRW: {data.get('USDKRW')}
+    sp = data.get("S&P500", 0)
+    nd = data.get("NASDAQ", 0)
+    vix = data.get("VIX", 0)
 
-점수: {score}
+    comments = []
 
-5줄 요약으로 설명
-"""
+    if nd > 1:
+        comments.append("나스닥이 강세를 보이며 성장주 투자심리가 개선되고 있습니다.")
 
-        response = model.generate_content(prompt)
-        return response.text
+    if sp > 0.5:
+        comments.append("S&P500 상승으로 미국 주식 전반의 분위기는 긍정적입니다.")
 
-    except Exception as e:
-        return f"AI 오류: {str(e)}"
-        
+    if vix < -5:
+        comments.append("VIX가 크게 하락하여 시장 불안감은 완화된 상태입니다.")
+
+    if score >= 75:
+        comments.append("다만 시장이 강세 구간이므로 공격적인 추가매수는 신중하게 접근하는 것이 좋습니다.")
+
+    return "\n".join(comments)
+
 # -----------------------------
 # 3. 브리핑 생성
 # -----------------------------
@@ -99,14 +96,16 @@ def create_message(data, score, ai_summary=""):
         ""
     ]
 
-    if score < 55:
-        lines.append("🟢 정기매수 유지")
-    elif score < 70:
-        lines.append("🟡 관망")
-    elif score < 85:
-        lines.append("🔴 분할매수")
-    else:
-        lines.append("🚨 적극 매수")
+   if score < 50:
+    lines.append("🟢 정기매수 유지")
+elif score < 65:
+    lines.append("🟡 관망")
+elif score < 80:
+    lines.append("🟠 관심 구간")
+elif score < 90:
+    lines.append("🔴 추가매수 검토")
+else:
+    lines.append("🚨 강력 추가매수")
 
     return "\n".join(lines)
 
@@ -128,8 +127,7 @@ def send_telegram(message):
 # -----------------------------
 data = get_market_data()
 score = score_market(data)
-
-ai_summary = get_ai_summary(data, score)
+ai_summary = get_market_comment(data, score)
 
 message = create_message(data, score, ai_summary)
 
