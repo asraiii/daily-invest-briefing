@@ -96,16 +96,16 @@ def create_message(data, score, ai_summary=""):
         ""
     ]
 
-   if score < 50:
-    lines.append("🟢 정기매수 유지")
-elif score < 65:
-    lines.append("🟡 관망")
-elif score < 80:
-    lines.append("🟠 관심 구간")
-elif score < 90:
-    lines.append("🔴 추가매수 검토")
-else:
-    lines.append("🚨 강력 추가매수")
+    if score < 50:
+        lines.append("🟢 정기매수 유지")
+    elif score < 65:
+        lines.append("🟡 관망")
+    elif score < 80:
+        lines.append("🟠 관심 구간")
+    elif score < 90:
+        lines.append("🔴 추가매수 검토")
+    else:
+        lines.append("🚨 강력 추가매수")
 
     return "\n".join(lines)
 
