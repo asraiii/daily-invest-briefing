@@ -6,8 +6,8 @@ import google.generativeai as genai
 
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
-genai.configure(api_key=GEMINI_API_KEY)
+os.environ["GEMINI_API_KEY"]
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
 model = genai.GenerativeModel("gemini-1.5-flash")
 
@@ -58,9 +58,7 @@ def score_market(data):
 def get_ai_summary(data, score):
     try:
         prompt = f"""
-너는 전문 투자 애널리스트다.
-
-다음 시장 데이터를 분석해라:
+너는 투자 애널리스트다.
 
 S&P500: {data.get('S&P500')}
 NASDAQ: {data.get('NASDAQ')}
@@ -69,21 +67,16 @@ USD/KRW: {data.get('USDKRW')}
 
 점수: {score}
 
-조건:
-- 5줄 이내
-- 한국어
-- 투자 관점
-- 과장 금지
-- "왜 이런 시장인지" 설명
+5줄 요약으로 설명
 """
 
-    try:
-       response = model.generate_content(prompt)
+        response = model.generate_content(prompt)
         return response.text
 
     except Exception as e:
         print("AI ERROR:", e)
         return f"AI 분석 실패 ({str(e)[:50]})"
+        
 # -----------------------------
 # 3. 브리핑 생성
 # -----------------------------
