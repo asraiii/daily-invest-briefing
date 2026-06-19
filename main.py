@@ -49,8 +49,7 @@ def get_market_data():
 
             current_price = 0
             
-            if current_price == 0:
-                current_price = hist_1y["Close"].dropna().iloc[-1]
+            current_price = hist_1y["Close"].dropna().iloc[-1]
     
             if len(hist_1y) >= 2:
                 current_price = hist_1y["Close"].iloc[-1]
@@ -112,118 +111,47 @@ def get_fear_greed():
 # -----------------------------
 
 
-def get_market_comment(
-    data,
-    fear_score,
-    fear_status
-):
+def get_market_comment(data, fear_score, fear_status):
 
     comments = []
 
-    
     sp = abs(data["S&P500"]["drawdown"])
     nd = abs(data["NASDAQ"]["drawdown"])
-    vix = data["VIX"]["daily"]
+    vix = data["VIX"]["current"]
     usdkrw = data["USDKRW"]["current"]
 
-    # Fear & Greed 추가
     comments.append(
         f"Fear & Greed 지수는 {fear_score}점으로 현재 '{fear_status}' 구간입니다."
     )
 
-    # 시장 위치
+    # 시장
     if sp < 5:
-
-        comments.append(
-            f"S&P500은 최근 1년 최고점 대비 {sp:.1f}% 하락에 불과하며 사실상 신고가 부근입니다."
-        )
-
-        comments.append(
-            f"NASDAQ100도 최고점 대비 {nd:.1f}% 하락 수준으로 성장주 강세 흐름이 유지되고 있습니다."
-        )
-
-        comments.append(
-            "시장은 낙관적인 분위기가 우세하며 투자심리가 안정적인 상태입니다."
-        )
-
+        comments.append(f"S&P500은 {sp:.1f}% 수준")
     elif sp < 10:
-
-        comments.append(
-            f"S&P500은 최고점 대비 {sp:.1f}% 하락한 상태입니다."
-        )
-
-        comments.append(
-            "정상적인 조정 범위로 볼 수 있으며 장기 상승 추세는 아직 유지되고 있습니다."
-        )
-
+        comments.append(f"S&P500 조정 {sp:.1f}%")
     elif sp < 20:
-
-        comments.append(
-            f"S&P500은 최고점 대비 {sp:.1f}% 하락했습니다."
-        )
-
-        comments.append(
-            "과거 기준으로 의미 있는 조정 구간에 진입한 상태입니다."
-        )
-
-        comments.append(
-            "장기 투자자라면 추가 자금을 분할 투입하기 시작할 수 있는 구간입니다."
-        )
-
+        comments.append(f"S&P500 의미있는 조정 {sp:.1f}%")
     else:
+        comments.append(f"S&P500 큰 조정 {sp:.1f}%")
 
-        comments.append(
-            f"S&P500은 최고점 대비 {sp:.1f}% 하락했습니다."
-        )
+    # VIX (✔️ 반드시 함수 안)
+    if vix >= 25:
+        comments.append("시장 변동성이 매우 높은 구간입니다.")
+    elif vix >= 18:
+        comments.append("변동성이 다소 상승한 상태입니다.")
+    else:
+        comments.append("변동성이 안정적인 구간입니다.")
 
-        comments.append(
-            "역사적으로 드물게 나타나는 큰 폭의 조정 구간입니다."
-        )
-
-        comments.append(
-            "장기 투자자에게는 적극적인 매수 기회가 될 수 있습니다."
-        )
-
-    # 변동성
-    vix = data["VIX"]["current"]  # 이걸 써야 정상
-
-if vix >= 25:
-    comments.append("시장 변동성이 매우 높은 구간입니다.")
-elif vix >= 18:
-    comments.append("변동성이 다소 상승한 상태입니다.")
-else:
-    comments.append("변동성이 안정적인 구간입니다.")
-
-    
-    # 환율 코멘트
-
+    # 환율
     if usdkrw >= 1400:
-
-        comments.append(
-            f"원달러 환율은 {usdkrw:.0f}원 수준으로 높은 편이며 해외자산 매수 시 환율 부담이 존재합니다."
-        )
-
+        comments.append(f"환율 {usdkrw:.0f}원 (고평가)")
     elif usdkrw >= 1300:
-
-        comments.append(
-            f"원달러 환율은 {usdkrw:.0f}원 수준으로 다소 높은 구간입니다."
-        )
-
-    elif usdkrw >= 1200:
-
-        comments.append(
-            f"원달러 환율은 {usdkrw:.0f}원 수준으로 평균 범위에 위치하고 있습니다."
-        )
-
+        comments.append(f"환율 {usdkrw:.0f}원 (상단)")
     else:
+        comments.append(f"환율 {usdkrw:.0f}원 (양호)")
 
-        comments.append(
-            f"원달러 환율은 {usdkrw:.0f}원 수준으로 비교적 낮은 편이며 달러 자산 매수에 유리한 환경입니다."
-        )
-        
-    # 투자 전략
     comments.append("")
-    comments.append("장기 투자 관점에서는 VOO, QQQM, SCHD 적립식을 유지하는 전략이 유효합니다.")
+    comments.append("VOO, QQQM, SCHD 적립 유지")
 
     return "\n".join(comments)
 
@@ -352,8 +280,7 @@ def create_message(
         f"NASDAQ : {data['NASDAQ']['daily']}%",
         f"SCHD : {data['SCHD']['daily']}%",
         f"VIX : {data['VIX']['daily']}%",
-        f"USD/KRW : {data['USDKRW']['daily']}%",
-        f"환율 : {round(data['USDKRW']['current'])}원",
+        f"USD/KRW : {data['USDKRW']['current']}원 ({data['USDKRW']['daily']}%)",
         f"Fear & Greed : {fear_score}점 ({fear_status})",
         "",
 
