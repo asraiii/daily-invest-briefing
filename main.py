@@ -72,10 +72,12 @@ def get_market_data():
 # -----------------------------
 def score_market(data):
 
+    print(data)
+
     score = 0
 
-    sp = abs(data.get("S&P500", 0))
-    nd = abs(data.get("NASDAQ", 0))
+    sp = abs(data["S&P500"]["drawdown"])
+    nd = abs(data["NASDAQ"]["drawdown"])
 
     # S&P500 기준
     if sp >= 5:
@@ -165,7 +167,7 @@ def create_message(data, score, ai_summary=""):
         ""
     ]
 
-    if score < 40:
+    if score < 30:
         lines.append("🟢 정기매수만 진행")
 
     elif score < 80:
