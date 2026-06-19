@@ -106,29 +106,53 @@ def score_market(data):
         score += 10
 
     return min(score, 100)
-def get_market_comment(data, score):
+def get_market_comment(data):
 
-    sp = data["S&P500"]["drawdown"]
-    nd = data["NASDAQ"]["drawdown"]
+    sp = abs(data["S&P500"]["drawdown"])
+    nd = abs(data["NASDAQ"]["drawdown"])
 
     comments = []
 
-    comments.append(
-        f"S&P500은 최근 1년 최고점 대비 {abs(sp):.1f}% 하락 상태입니다."
-    )
+    if sp < 10:
 
-    comments.append(
-        f"NASDAQ100은 최근 1년 최고점 대비 {abs(nd):.1f}% 하락 상태입니다."
-    )
-
-    if nd <= -10:
         comments.append(
-            "기술주 중심의 조정이 진행되고 있습니다."
+            f"현재 S&P500은 최근 1년 최고점 대비 {sp:.1f}% 하락한 수준으로, 사실상 신고가 부근에 위치해 있습니다."
         )
 
-    if nd <= -20:
         comments.append(
-            "과거 기준으로 의미있는 매수 구간에 접근하고 있습니다."
+            f"NASDAQ100 역시 최고점 대비 {nd:.1f}% 하락에 불과해 성장주 투자심리는 여전히 양호한 상태입니다."
+        )
+
+        comments.append(
+            "현재 구간은 공격적인 현금 투입보다 정기 적립식 매수를 유지하는 것이 유리합니다."
+        )
+
+    elif sp < 20:
+
+        comments.append(
+            f"S&P500은 최근 1년 최고점 대비 {sp:.1f}% 하락했습니다."
+        )
+
+        comments.append(
+            "과거 기준으로 의미 있는 조정 구간에 진입했습니다."
+        )
+
+        comments.append(
+            "정기매수를 유지하면서 여유 현금을 일부 투입하는 전략이 유효합니다."
+        )
+
+    else:
+
+        comments.append(
+            f"S&P500은 최근 1년 최고점 대비 {sp:.1f}% 하락했습니다."
+        )
+
+        comments.append(
+            "과거 데이터 기준으로 드문 수준의 조정이 진행되고 있습니다."
+        )
+
+        comments.append(
+            "장기 투자자에게는 적극적인 추가매수를 고려할 수 있는 구간입니다."
         )
 
     return "\n".join(comments)
@@ -162,19 +186,21 @@ def create_message(data, score, ai_summary=""):
         ai_summary if ai_summary else "데이터 수집 중...",
         "",
         
-        "[추가매수 점수]",
-        f"{score}/100",
+        "[투자 신호]",
+        signal,
         ""
+        "[시장 해]",
+        ai_summary
     ]
 
     if score < 30:
-        lines.append("🟢 정기매수만 진행")
+        lines.append("🟢 정기매수")
 
     elif score < 80:
         lines.append("🔴 적극 추가매수")
 
     else:
-        lines.append("🔥 역사적 저점 수준")
+        lines.append("🔥 역사적 저점")
 
     
     if score >= 60:
