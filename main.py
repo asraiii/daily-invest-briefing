@@ -187,7 +187,7 @@ def get_market_comment(data):
 # -----------------------------
 # 3. 브리핑 생성
 # -----------------------------
-def create_message(data, market_comment):
+def create_message(data, market_comment, signal):
 
     now = datetime.now().strftime("%Y-%m-%d")
 
@@ -207,6 +207,10 @@ def create_message(data, market_comment):
         f"NASDAQ : {data['NASDAQ']['drawdown']}%",
         f"VIX : {data['VIX']['drawdown']}%",
         f"USD/KRW : {data['USDKRW']['drawdown']}%",
+        "",
+        
+        "[투자 신호]",
+        signal,
         "",
 
         "[시장 해설]",
@@ -233,11 +237,14 @@ def send_telegram(message):
 # -----------------------------
 data = get_market_data()
 
+signal = get_invest_signal(data)
+
 market_comment = get_market_comment(data)
 
 message = create_message(
     data,
-    market_comment
+    market_comment,
+    signal
 )
 
 send_telegram(message)
