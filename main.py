@@ -20,6 +20,7 @@ def get_market_data():
     tickers = {
         "S&P500": "^GSPC",
         "NASDAQ": "^NDX",
+        "SCHD": "SCHD",
         "VIX": "^VIX",
         "USDKRW": "KRW=X"
     }
@@ -48,6 +49,9 @@ def get_market_data():
 
             current_price = 0
             
+            if current_price == 0:
+                current_price = hist_1y["Close"].dropna().iloc[-1]
+    
             if len(hist_1y) >= 2:
                 current_price = hist_1y["Close"].iloc[-1]
                 high_price = hist_1y["Close"].max()
@@ -75,21 +79,57 @@ def get_market_data():
             }
 
     return data
+    
+def get_fear_greed():
 
+    try:
 
+        url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+
+        response = requests.get(url, timeout=10)
+
+        score = response.json()["fear_and_greed"]["score"]
+
+        if score >= 75:
+            status = "극도의 탐욕"
+        elif score >= 55:
+            status = "탐욕"
+        elif score >= 45:
+            status = "중립"
+        elif score >= 25:
+            status = "공포"
+        else:
+            status = "극도의 공포"
+
+        return score, status
+
+    except Exception as e:
+        print("Fear & Greed Error:", e)
+        return 0, "확인불가"
+        
 # -----------------------------
 # 2. 간단 점수 시스템
 # -----------------------------
 
 
-def get_market_comment(data):
+def get_market_comment(
+    data,
+    fear_score,
+    fear_status
+):
 
+    comments = []
+
+    
     sp = abs(data["S&P500"]["drawdown"])
     nd = abs(data["NASDAQ"]["drawdown"])
     vix = data["VIX"]["daily"]
     usdkrw = data["USDKRW"]["current"]
 
-    comments = []
+    # Fear & Greed 추가
+    comments.append(
+        f"Fear & Greed 지수는 {fear_score}점으로 현재 '{fear_status}' 구간입니다."
+    )
 
     # 시장 위치
     if sp < 5:
@@ -145,15 +185,16 @@ def get_market_comment(data):
         )
 
     # 변동성
-    if vix <= -5:
-        comments.append(
-            "VIX가 크게 하락하며 시장의 공포 심리가 완화되었습니다."
-        )
+    vix = data["VIX"]["current"]  # 이걸 써야 정상
 
-    elif vix >= 5:
-        comments.append(
-            "VIX가 상승하며 단기 변동성 확대 가능성이 나타나고 있습니다."
-        )
+if vix >= 25:
+    comments.append("시장 변동성이 매우 높은 구간입니다.")
+elif vix >= 18:
+    comments.append("변동성이 다소 상승한 상태입니다.")
+else:
+    comments.append("변동성이 안정적인 구간입니다.")
+
+    
     # 환율 코멘트
 
     if usdkrw >= 1400:
@@ -192,18 +233,18 @@ def get_market_comment(data):
 # -----------------------------
 
 
-def get_invest_signal(data):
+def get_invest_signal(data, fear_score):
 
     sp = abs(data["S&P500"]["drawdown"])
 
-    if sp < 10:
-        return "🟢 정기매수"
+    if sp >= 25 or fear_score <= 20:
+        return "🔴 공격매수"
 
-    elif sp < 20:
-        return "🔴 적극 추가매수"
+    elif sp >= 10 or fear_score <= 40:
+        return "🟡 적극매수"
 
     else:
-        return "🔥 역사적 저점"
+        return "🟢 정기매수"
 
 
 # -----------------------------
@@ -218,35 +259,36 @@ def get_economic_issues():
         model = genai.GenerativeModel("gemini-2.5-flash")
 
         prompt = """
-오늘 기준 가장 중요한 국내외 경제 이슈 5개를 작성해줘.
+최근 24시간 내 가장 중요한 경제·금융 변화 3개를 작성해줘.
 
 형식:
 
 1. 제목
-영향 : 긍정
-투자영향 : 한줄
+
+무슨 일:
+시장영향:
 
 2. 제목
-영향 : 부정
-투자영향 : 한줄
+
+무슨 일:
+시장영향:
 
 3. 제목
-영향 : 중립
-투자영향 : 한줄
 
-4. 제목
-영향 : 긍정
-투자영향 : 한줄
+무슨 일:
+시장영향:
 
-5. 제목
-영향 : 부정
-투자영향 : 한줄
-
-설명은 짧게.
-반드시 위 형식만 사용.
+반드시 최근 24시간 기준.
+짧고 핵심만 작성.
 """
 
-        response = model.generate_content(prompt)
+        response = model.generate_content(
+    prompt,
+    generation_config={
+        "temperature": 0.3,
+        "max_output_tokens": 800
+    }
+)
 
         return response.text[:1500]
 
@@ -262,29 +304,21 @@ def get_economic_issues():
 # -----------------------------
 
 
-def get_market_summary(signal, economic_issues):
+def get_market_summary(
+    signal,
+    fear_score,
+    fear_status,
+    data
+):
 
-    positive = economic_issues.count("긍정")
-    negative = economic_issues.count("부정")
-
-    if positive > negative:
-
-        mood = "시장 분위기는 다소 우호적입니다."
-
-    elif negative > positive:
-
-        mood = "시장 분위기는 다소 경계가 필요합니다."
-
-    else:
-
-        mood = "시장 분위기는 중립적입니다."
+    sp = abs(data["S&P500"]["drawdown"])
 
     summary = f"""
-긍정 이슈 {positive}건, 부정 이슈 {negative}건입니다.
+Fear & Greed 지수는 {fear_score}점 ({fear_status}) 입니다.
 
-{mood}
+S&P500은 최근 최고점 대비 {sp:.1f}% 하락 상태입니다.
 
-현재 투자 신호는 {signal} 상태입니다.
+현재 투자 신호는 {signal} 입니다.
 
 장기 투자자는 VOO·QQQM·SCHD 적립식을 유지하는 전략이 적절합니다.
 """
@@ -302,7 +336,9 @@ def create_message(
     market_comment,
     signal,
     economic_issues,
-    market_summary
+    market_summary,
+    fear_score,
+    fear_status
 ):
 
     now = datetime.now().strftime("%Y-%m-%d")
@@ -314,23 +350,24 @@ def create_message(
         "[오늘 시장 등락]",
         f"S&P500 : {data['S&P500']['daily']}%",
         f"NASDAQ : {data['NASDAQ']['daily']}%",
+        f"SCHD : {data['SCHD']['daily']}%",
         f"VIX : {data['VIX']['daily']}%",
         f"USD/KRW : {data['USDKRW']['daily']}%",
         f"환율 : {round(data['USDKRW']['current'])}원",
+        f"Fear & Greed : {fear_score}점 ({fear_status})",
         "",
 
-        "[최근 1년 최고점 대비]",
+        "[최근 최고점 대비]",
         f"S&P500 : {data['S&P500']['drawdown']}%",
         f"NASDAQ : {data['NASDAQ']['drawdown']}%",
-        f"VIX : {data['VIX']['drawdown']}%",
-        f"USD/KRW : {data['USDKRW']['drawdown']}%",
+        f"SCHD : {data['SCHD']['drawdown']}%",
         "",
         
         "[투자 신호]",
         signal,
         "",
 
-        "[주요 경제 이슈 TOP5]",
+        "[24시간 내 중요 변화 TOP3]",
         economic_issues,
         "",
 
@@ -366,15 +403,26 @@ def send_telegram(message):
 
 data = get_market_data()
 
-signal = get_invest_signal(data)
+fear_score, fear_status = get_fear_greed()
 
-market_comment = get_market_comment(data)
+signal = get_invest_signal(
+    data,
+    fear_score
+)
+
+market_comment = get_market_comment(
+    data,
+    fear_score,
+    fear_status
+)
 
 economic_issues = get_economic_issues()
 
 market_summary = get_market_summary(
     signal,
-    economic_issues
+    fear_score,
+    fear_status,
+    data
 )
 
 message = create_message(
@@ -382,7 +430,9 @@ message = create_message(
     market_comment,
     signal,
     economic_issues,
-    market_summary
+    market_summary,
+    fear_score,
+    fear_status
 )
 
 send_telegram(message)
