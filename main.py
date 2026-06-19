@@ -2,10 +2,14 @@ import os
 import requests
 import yfinance as yf
 from datetime import datetime
+import google.generativeai as genai
 
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+genai.configure(api_key=GEMINI_API_KEY)
+
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 # -----------------------------
 # 1. 시장 데이터 수집
@@ -51,6 +55,32 @@ def score_market(data):
 
     return max(0, min(100, round(score, 1)))
 
+def get_ai_summary(data, score):
+    prompt = f"""
+너는 전문 투자 애널리스트다.
+
+다음 시장 데이터를 분석해라:
+
+S&P500: {data['S&P500']}%
+NASDAQ: {data['NASDAQ']}%
+VIX: {data['VIX']}%
+USD/KRW: {data['USDKRW']}%
+
+추가매수 점수: {score}/100
+
+조건:
+- 5줄 이내
+- 한국어
+- 투자 관점
+- 과장 금지
+- "왜 이런 시장인지" 설명
+"""
+
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except:
+        return "AI 분석 실패"
 
 # -----------------------------
 # 3. 브리핑 생성
@@ -105,7 +135,8 @@ def send_telegram(message):
 data = get_market_data()
 score = score_market(data)
 
-ai_summary = ""
+ai_summary = get_ai_summary(data, score)
+
 message = create_message(data, score, ai_summary)
 
 send_telegram(message)
