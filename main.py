@@ -21,9 +21,8 @@ def get_market_data():
     tickers = {
         "S&P500": "^GSPC",
         "NASDAQ": "^NDX",
-        "SCHD": "SCHD",
         "VIX": "^VIX",
-        "USDKRW": "KRW=X"
+        "USDKRW": "KRW=X",
     }
 
     data = {}
@@ -35,35 +34,37 @@ def get_market_data():
             hist_5d = t.history(period="5d")
             hist_1y = t.history(period="1y")
 
-            # daily
+            # daily change
             if len(hist_5d) >= 2:
-                close = hist_5d["Close"].tail(2).values
+                close = hist_5d["Close"].dropna().values
                 daily = (close[-1] - close[-2]) / close[-2] * 100
             else:
                 daily = 0
 
-            # current
-            current = hist_1y["Close"].dropna().iloc[-1]
-
             # drawdown
-            high = hist_1y["Close"].max()
-            drawdown = (current - high) / high * 100
+            if len(hist_1y) > 0:
+                current = hist_1y["Close"].dropna().iloc[-1]
+                high = hist_1y["Close"].max()
+                drawdown = (current - high) / high * 100
+            else:
+                current = 0
+                drawdown = 0
 
             data[name] = {
-                "daily": round(daily, 2),
+                "daily": round(float(daily), 2),
+                "drawdown": round(float(drawdown), 2),
                 "current": round(float(current), 2),
-                "drawdown": round(float(drawdown), 2)
             }
 
         except Exception as e:
-            print(name, e)
-            data[name] = {"daily": 0, "current": 0, "drawdown": 0}
+            print(name, "error:", e)
+            data[name] = {"daily": 0, "drawdown": 0, "current": 0}
 
     return data
 
 
 # =========================
-# 2. Fear & Greed (안끊김 버전)
+# 2. Fear & Greed (안깨지는 버전)
 # =========================
 def get_fear_greed():
     try:
@@ -71,11 +72,10 @@ def get_fear_greed():
         r = requests.get(url, timeout=10)
         r.raise_for_status()
 
-        score = int(r.json()["fear_and_greed"]["score"])
-        return score, "정상"
+        score = r.json()["fear_and_greed"]["score"]
+        return int(score), "정상"
 
-    except Exception as e:
-        print("Fear & Greed error:", e)
+    except Exception:
         return 50, "중립"
 
 
@@ -94,10 +94,11 @@ def get_signal(data, fear):
 
 
 # =========================
-# 4. 시장 해설 (중복 없음)
+# 4. 시장 코멘트
 # =========================
 def get_comment(data, fear, status):
     sp = abs(data["S&P500"]["drawdown"])
+    nd = abs(data["NASDAQ"]["drawdown"])
     vix = data["VIX"]["current"]
     usd = data["USDKRW"]["current"]
 
@@ -109,111 +110,121 @@ def get_comment(data, fear, status):
         out.append(f"S&P500: 신고가 근처 ({sp:.1f}%)")
     elif sp < 10:
         out.append(f"S&P500: 소폭 조정 ({sp:.1f}%)")
+    elif sp < 20:
+        out.append(f"S&P500: 의미있는 조정 ({sp:.1f}%)")
     else:
-        out.append(f"S&P500: 조정 구간 ({sp:.1f}%)")
+        out.append(f"S&P500: 큰 조정 ({sp:.1f}%)")
 
     if vix >= 25:
-        out.append("변동성: 매우 높음")
+        out.append("변동성 매우 높음")
     elif vix >= 18:
-        out.append("변동성: 상승")
+        out.append("변동성 상승")
     else:
-        out.append("변동성: 안정")
+        out.append("변동성 안정")
 
-    out.append(f"환율: {usd:.0f}원")
+    if usd >= 1400:
+        out.append(f"환율 {usd:.0f}원 (높음)")
+    else:
+        out.append(f"환율 {usd:.0f}원")
 
     return "\n".join(out)
 
 
 # =========================
-# 5. 경제 이슈 (끊김 방지 핵심 수정)
+# 5. 경제 이슈 (안 끊기게 핵심 개선)
 # =========================
 def get_economic_issues():
     try:
         model = genai.GenerativeModel("gemini-2.5-flash")
 
         prompt = """
-최근 24시간 경제/금융 이슈 3개.
+최근 24시간 경제/금융 핵심 이슈 5개.
 
-형식:
-1. 제목 - 핵심요약 (1줄)
-2. 제목 - 핵심요약 (1줄)
-3. 제목 - 핵심요약 (1줄)
+반드시 아래 형식 정확히:
 
-절대 길게 쓰지 말고 한 줄로 끝낼 것.
+1. 제목
+영향: 긍정/부정/중립
+설명: 1줄
+
+2. 제목
+영향: 긍정/부정/중립
+설명: 1줄
+
+3. 제목
+영향: 긍정/부정/중립
+설명: 1줄
+
+4. 제목
+영향: 긍정/부정/중립
+설명: 1줄
+
+5. 제목
+영향: 긍정/부정/중립
+설명: 1줄
 """
 
         res = model.generate_content(
             prompt,
-            generation_config={
-                "temperature": 0.3,
-                "max_output_tokens": 300
-            }
+            generation_config={"temperature": 0.3, "max_output_tokens": 1200},
         )
 
-        text = res.text.strip()
-
-        # 🔥 끊김 방지 핵심
-        lines = [l for l in text.split("\n") if l.strip()]
-        return "\n".join(lines[:3])
+        return res.text.strip()
 
     except Exception as e:
         print("Gemini error:", e)
-        return "이슈 로딩 실패"
+        return "이슈 불러오기 실패"
 
 
 # =========================
-# 6. 최고점 대비
+# 6. 메시지 생성 (네가 원하는 최종 포맷)
 # =========================
-def get_drawdowns(data):
-    return {
-        k: data[k]["drawdown"]
-        for k in ["S&P500", "NASDAQ", "SCHD"]
-    }
+def build_message(data, fear, status, signal, issues):
 
+    now = datetime.now().strftime("%Y-%m-%d")
 
-# =========================
-# 7. 메시지 생성 (중복 제거 완료)
-# =========================
-def create_message(data, fear, status, signal, issues):
+    sp = abs(data["S&P500"]["drawdown"])
+    nd = abs(data["NASDAQ"]["drawdown"])
 
-    today = datetime.now().strftime("%Y-%m-%d")
-    dd = get_drawdowns(data)
+    msg = f"""📊 투자 브리핑 ({now})
 
-    msg = f"""📊 투자 브리핑 ({today})
-
-[시장]
+[오늘 시장 등락]
 S&P500: {data['S&P500']['daily']}%
 NASDAQ: {data['NASDAQ']['daily']}%
-SCHD: {data['SCHD']['daily']}%
 VIX: {data['VIX']['daily']}%
-USD/KRW: {data['USDKRW']['current']}원
+USD/KRW: {data['USDKRW']['daily']}%
+환율: {data['USDKRW']['current']}원
 
-Fear & Greed: {fear} ({status})
+[최근 1년 최고점 대비]
+S&P500: {data['S&P500']['drawdown']}%
+NASDAQ: {data['NASDAQ']['drawdown']}%
 
-[최근 최고점 대비]
-S&P500: {dd['S&P500']}%
-NASDAQ: {dd['NASDAQ']}%
-SCHD: {dd['SCHD']}%
-
-[신호]
+[투자 신호]
 {signal}
 
-[이슈]
+[주요 경제 이슈 TOP5]
 {issues}
+
+[종합 판단]
+S&P500: -{sp:.1f}%
+NASDAQ: -{nd:.1f}%
+현재 신호: {signal}
+
+[시장 해설]
+S&P500은 최근 고점 대비 {sp:.1f}% 수준 조정 상태입니다.
+NASDAQ도 유사한 흐름입니다.
+VIX 변동성은 시장 심리를 보여줍니다.
+환율은 {data['USDKRW']['current']:.0f}원 수준입니다.
 """
 
     return msg
 
 
 # =========================
-# 8. 텔레그램
+# 7. 텔레그램 전송
 # =========================
-def send_telegram(text):
+def send(msg):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    requests.post(url, json={
-        "chat_id": CHAT_ID,
-        "text": text
-    })
+    requests.post(url, json={"chat_id": CHAT_ID, "text": msg})
 
 
 # =========================
@@ -224,5 +235,5 @@ fear, status = get_fear_greed()
 signal = get_signal(data, fear)
 issues = get_economic_issues()
 
-message = create_message(data, fear, status, signal, issues)
-send_telegram(message)
+message = build_message(data, fear, status, signal, issues)
+send(message)
