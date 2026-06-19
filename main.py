@@ -23,26 +23,46 @@ def get_market_data():
     for name, symbol in tickers.items():
         try:
             ticker = yf.Ticker(symbol)
-            hist = ticker.history(period="1y")
 
-            if len(hist) >= 2:
+            # 오늘 등락률
+            hist_5d = ticker.history(period="5d")
 
-                current_price = hist["Close"].iloc[-1]
-                high_price = hist["Close"].max()
+            if len(hist_5d) >= 2:
+                close = hist_5d["Close"].tail(2).values
+
+                daily_change = (
+                    (close[-1] - close[-2])
+                    / close[-2]
+                ) * 100
+            else:
+                daily_change = 0
+
+            # 1년 최고점 대비 하락률
+            hist_1y = ticker.history(period="1y")
+
+            if len(hist_1y) >= 2:
+                current_price = hist_1y["Close"].iloc[-1]
+                high_price = hist_1y["Close"].max()
 
                 drawdown = (
                     (current_price - high_price)
                     / high_price
                 ) * 100
-
-                data[name] = round(float(drawdown), 2)
-
             else:
-                data[name] = 0.0
+                drawdown = 0
+
+            data[name] = {
+                "daily": round(float(daily_change), 2),
+                "drawdown": round(float(drawdown), 2)
+            }
 
         except Exception as e:
             print(f"{name} error:", e)
-            data[name] = 0.0
+
+            data[name] = {
+                "daily": 0,
+                "drawdown": 0
+            }
 
     return data
 
@@ -54,10 +74,9 @@ def score_market(data):
 
     score = 0
 
-    sp = abs(data.get("S&P500", 0))
-    nd = abs(data.get("NASDAQ", 0))
+    sp = abs(data["S&P500"]["drawdown"])
+    nd = abs(data["NASDAQ"]["drawdown"])
 
-    # S&P500 기준
     if sp >= 5:
         score += 20
     if sp >= 10:
@@ -69,7 +88,6 @@ def score_market(data):
     if sp >= 30:
         score += 20
 
-    # NASDAQ 기준
     if nd >= 8:
         score += 10
     if nd >= 15:
@@ -80,11 +98,10 @@ def score_market(data):
         score += 20
 
     return min(score, 100)
-
 def get_market_comment(data, score):
 
-    sp = data.get("S&P500", 0)
-    nd = data.get("NASDAQ", 0)
+    sp = data["S&P500"]["drawdown"]
+    nd = data["NASDAQ"]["drawdown"]
 
     comments = []
 
@@ -117,15 +134,26 @@ def create_message(data, score, ai_summary=""):
     lines = [
         f"📊 투자 브리핑 ({now})",
         "",
-        "[시장 상태]",
-        f"S&P500: {data.get('S&P500')}%",
-        f"NASDAQ: {data.get('NASDAQ')}%",
-        f"VIX: {data.get('VIX')}%",
-        f"USD/KRW: {data.get('USDKRW')}%",
+        
+        "[오늘 시장 등락]",
+        f"S&P500: {data['S&P500']['daily']}%",
+        f"NASDAQ: {data['NASDAQ']['daily']}%",
+        f"VIX: {data['VIX']['daily']}%",
+        f"USD/KRW: {data['USDKRW']['daily']}%",
         "",
+
+        "[최근 1년 최고점 대비]",
+        f"S&P500: {data['S&P500']['drawdown']}%",
+        f"NASDAQ: {data['NASDAQ']['drawdown']}%",
+        f"VIX: {data['VIX']['drawdown']}%",
+        f"USD/KRW: {data['USDKRW']['drawdown']}%",
+        "",
+        
+        
         "[핵심 이슈]",
         ai_summary if ai_summary else "데이터 수집 중...",
         "",
+        
         "[추가매수 점수]",
         f"{score}/100",
         ""
