@@ -79,16 +79,6 @@ def create_message(data, score):
     else:
         lines.append("🔴 추가매수 고려")
 
-    lines += [
-        "",
-        "[포트폴리오]",
-        "• VOO",
-        "• QQQM",
-        "• SCHD",
-        "• TIGER S&P500",
-        "• TIGER 나스닥100",
-        "• TIGER 배당/고배당 ETF"
-    ]
 
     return "\n".join(lines)
 
