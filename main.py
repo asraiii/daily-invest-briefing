@@ -43,13 +43,29 @@ def get_market_data():
 # 2. 간단 점수 시스템
 # -----------------------------
 def score_market(data):
-    score = 50
 
-    score += data.get("S&P500", 0) * 1
-    score += data.get("NASDAQ", 0) * 1.5
-    score -= data.get("VIX", 0) * 0.5
+    sp = data.get("S&P500", 0)
+    nd = data.get("NASDAQ", 0)
+    vix = data.get("VIX", 0)
 
-    return max(0, min(100, round(score, 1)))
+    score = 0
+
+    if sp <= -1:
+        score += 20
+
+    if sp <= -2:
+        score += 20
+
+    if nd <= -2:
+        score += 20
+
+    if nd <= -4:
+        score += 20
+
+    if vix >= 10:
+        score += 20
+
+    return min(score, 100)
 
 def get_market_comment(data, score):
 
@@ -96,16 +112,29 @@ def create_message(data, score, ai_summary=""):
         ""
     ]
 
-    if score < 50:
-        lines.append("🟢 정기매수 유지")
-    elif score < 65:
-        lines.append("🟡 관망")
+    if score < 20:
+        lines.append("🟢 정기매수만 진행")
+
+    elif score < 40:
+        lines.append("🟡 관심 구간")
+
+    elif score < 60:
+        lines.append("🟠 추가매수 검토")
+
     elif score < 80:
-        lines.append("🟠 관심 구간")
-    elif score < 90:
-        lines.append("🔴 추가매수 검토")
+        lines.append("🔴 추가매수")
+
     else:
         lines.append("🚨 강력 추가매수")
+
+    if score >= 60:
+        lines.extend([
+            "",
+            "[추천 비율]",
+            "QQQM 40%",
+            "VOO 40%",
+            "SCHD 20%"
+        ])
 
     return "\n".join(lines)
 
