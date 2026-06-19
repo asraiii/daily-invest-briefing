@@ -52,27 +52,28 @@ def get_market_data():
 # -----------------------------
 def score_market(data):
 
-    sp = data.get("S&P500", 0)
-    nd = data.get("NASDAQ", 0)
+    sp = abs(data.get("S&P500", 0))
+    nd = abs(data.get("NASDAQ", 0))
 
-    score = 0
+    avg_drop = (sp + nd) / 2
 
-    if sp <= -5:
-        score += 20
+    if avg_drop < 5:
+        return 0
 
-    if sp <= -10:
-        score += 20
+    elif avg_drop < 10:
+        return 20
 
-    if nd <= -10:
-        score += 20
+    elif avg_drop < 15:
+        return 40
 
-    if nd <= -15:
-        score += 20
+    elif avg_drop < 20:
+        return 60
 
-    if nd <= -20:
-        score += 20
+    elif avg_drop < 30:
+        return 80
 
-    return min(score, 100)
+    else:
+        return 100
 
 def get_market_comment(data, score):
 
