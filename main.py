@@ -27,9 +27,9 @@ def get_market_data():
             # 오늘 등락률
             hist_5d = ticker.history(period="5d")
 
-            if len(hist_5d) >= 2:
-                close = hist_5d["Close"].tail(2).values
+            close = hist_5d["Close"].dropna().tail(2).values
 
+            if len(close) >= 2:
                 daily_change = (
                     (close[-1] - close[-2])
                     / close[-2]
@@ -39,16 +39,18 @@ def get_market_data():
 
             # 1년 최고점 대비 하락률
             hist_1y = ticker.history(period="1y")
+            close_1y = hist_1y["Close"].dropna()
 
-            if len(hist_1y) >= 2:
-                current_price = hist_1y["Close"].iloc[-1]
-                high_price = hist_1y["Close"].max()
+            if len(close_1y) >= 2:
+                current_price = close_1y.iloc[-1]
+                high_price = close_1y.max()
 
                 drawdown = (
                     (current_price - high_price)
                     / high_price
                 ) * 100
             else:
+                current_price = 0
                 drawdown = 0
 
             data[name] = {
@@ -208,11 +210,11 @@ def create_message(data, market_comment):
         "[오늘 시장 등락]",
         f"S&P500 : {data['S&P500']['daily']}%",
         f"NASDAQ : {data['NASDAQ']['daily']}%",
-        f"환율 : {data['USDKRW']['current']:.0f}원",
+        f"환율 : {data['USDKRW']['current']:,.0f}원",
         "",
 
         "[VIX 지수]",
-        f"{data['VIX']['current']}",
+        f"현재 VIX : {data['VIX']['current']:.2f}",
         "",
 
         "[최근 1년 최고점 대비]",
