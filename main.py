@@ -2,6 +2,7 @@ import os
 import requests
 import yfinance as yf
 from datetime import datetime
+import holidays
 
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -231,6 +232,21 @@ def send_telegram(message):
 # -----------------------------
 # 실행
 # -----------------------------
+
+us_holidays = holidays.US()
+
+today = datetime.now().date()
+
+# 주말
+if today.weekday() >= 5:
+    print("주말 휴장")
+    exit()
+
+# 미국 휴장일
+if today in us_holidays:
+    print("미국 증시 휴장")
+    exit()
+
 data = get_market_data()
 
 market_comment = get_market_comment(data)
