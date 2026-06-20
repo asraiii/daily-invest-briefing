@@ -176,7 +176,21 @@ def get_market_comment(data):
 
     return "\n".join(comments)
 
+# -----------------------------
+# 하락률 신호등
+# -----------------------------
+def get_drawdown_light(drawdown):
 
+    drawdown = abs(drawdown)
+
+    if drawdown < 10:
+        return "🟢"
+
+    elif drawdown < 20:
+        return "🟡"
+
+    else:
+        return "🔴"
 # -----------------------------
 # 투자신호
 # -----------------------------
@@ -202,6 +216,14 @@ def create_message(data, market_comment):
     now = datetime.now().strftime("%Y-%m-%d")
     signal = get_invest_signal(data)
 
+    sp_light = get_drawdown_light(
+        data["S&P500"]["drawdown"]
+    )
+
+    nd_light = get_drawdown_light(
+        data["NASDAQ"]["drawdown"]
+    )
+    
     vix_now = data["VIX"]["current"]
 
     if vix_now < 15:
@@ -231,8 +253,8 @@ def create_message(data, market_comment):
         "",
 
         "[최근 1년 최고점 대비]",
-        f"S&P500 : {data['S&P500']['drawdown']}%",
-        f"NASDAQ : {data['NASDAQ']['drawdown']}%",
+        f"S&P500 : {data['S&P500']['drawdown']}% {sp_light}",
+        f"NASDAQ : {data['NASDAQ']['drawdown']}% {nd_light}",
         "",
 
         "[투자신호]",
