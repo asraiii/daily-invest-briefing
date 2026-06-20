@@ -210,6 +210,22 @@ def get_vix_light(vix):
         return "🔴"
 
 # -----------------------------
+# 환율 신호등
+# -----------------------------
+def get_fx_light(fx):
+    
+    # fx = USDKRW (원/달러 환율)
+
+    if fx < 1400:
+        return "🔴"  # 달러 싸다 → 매수 좋음
+
+    elif fx < 1500:
+        return "🟡"  # 보통
+
+    else:
+        return "🟢"  # 달러 비싸다 → 매수 비효율
+
+# -----------------------------
 # 투자신호
 # -----------------------------
 def get_invest_signal(data):
@@ -243,6 +259,9 @@ def create_message(data, market_comment):
     )
     
     vix_now = data["VIX"]["current"]
+    
+    fx = data["USDKRW"]["current"]
+    fx_light = get_fx_light(fx)
 
     vix_light = get_vix_light(vix_now)
 
@@ -265,7 +284,7 @@ def create_message(data, market_comment):
         "[오늘 시장 등락]",
         f"S&P500 : {data['S&P500']['daily']}%",
         f"NASDAQ : {data['NASDAQ']['daily']}%",
-        f"환율 : {data['USDKRW']['current']:,.0f}원",
+        f"환율 : {fx:,.0f}원 {fx_light}",
         "",
 
         "[VIX 지수]",
