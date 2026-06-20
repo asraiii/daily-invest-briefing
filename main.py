@@ -191,6 +191,24 @@ def get_drawdown_light(drawdown):
 
     else:
         return "🔴"
+
+# -----------------------------
+# VIX 신호등
+# -----------------------------
+def get_vix_light(vix):
+
+    if vix < 15:
+        return "🟢"
+
+    elif vix < 20:
+        return "🟡"
+
+    elif vix < 30:
+        return "🟠"
+
+    else:
+        return "🔴"
+
 # -----------------------------
 # 투자신호
 # -----------------------------
@@ -226,6 +244,8 @@ def create_message(data, market_comment):
     
     vix_now = data["VIX"]["current"]
 
+    vix_light = get_vix_light(vix_now)
+
     if vix_now < 15:
         vix_status = "안정·낙관"
 
@@ -249,7 +269,7 @@ def create_message(data, market_comment):
         "",
 
         "[VIX 지수]",
-        f"현재 VIX : {vix_now:.2f} ({vix_status})",
+        f"현재 VIX : {vix_now:.2f} {vix_light} ({vix_status})",
         "",
 
         "[최근 1년 최고점 대비]",
