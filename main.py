@@ -70,51 +70,6 @@ def get_market_data():
 
     return data
 
-# -----------------------------
-# 탐욕·공포 지수
-# -----------------------------
-def get_fear_greed():
-
-    try:
-        url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
-
-        response = requests.get(
-            url,
-            timeout=10,
-            headers={
-                "User-Agent": "Mozilla/5.0"
-            }
-        )
-
-        print(response.status_code)
-        print(response.text[:300])
-
-        data = response.json()
-
-        score = int(
-            data["fear_and_greed"]["score"]
-        )
-
-        if score < 25:
-            status = "😱 극도의 공포"
-
-        elif score < 45:
-            status = "😨 공포"
-
-        elif score < 55:
-            status = "😐 중립"
-
-        elif score < 75:
-            status = "😊 탐욕"
-
-        else:
-            status = "🚀 극도의 탐욕"
-
-        return score, status
-
-    except Exception as e:
-        print("Fear & Greed Error:", e)
-        return None, "데이터 없음"
 
 # -----------------------------
 # 2. 간단 점수 시스템
@@ -243,8 +198,19 @@ def create_message(data, market_comment):
 
     now = datetime.now().strftime("%Y-%m-%d")
     signal = get_invest_signal(data)
+    vix_now = data["VIX"]["current"]
 
-    fear_score, fear_status = get_fear_greed()
+if vix_now < 15:
+    vix_status = "안정·낙관"
+
+elif vix_now < 20:
+    vix_status = "보통"
+
+elif vix_now < 30:
+    vix_status = "불안 증가"
+
+else:
+    vix_status = "공포 확대"
 
     lines = [
         f"📊 투자 브리핑 ({now})",
@@ -256,8 +222,8 @@ def create_message(data, market_comment):
         f"환율 : {data['USDKRW']['current']:,.0f}원",
         "",
 
-        "[탐욕·공포 지수]",
-        f"현재 : {fear_score} ({fear_status})",
+        "[VIX 지수]",
+        f"현재 VIX : {vix_now:.2f} ({vix_status})",
         "",
 
         "[최근 1년 최고점 대비]",
