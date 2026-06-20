@@ -367,16 +367,13 @@ def send_telegram(message):
 # 실행
 # -----------------------------
 
-if is_weekend():
-    print("📴 주말이라 알림을 보내지 않습니다.")
-else:
-    data = get_market_data()
+data = get_market_data()
 
-    market_comment = get_market_comment(data)
+market_comment = get_market_comment(data)
 
-    message = create_message(
-        data,
-        market_comment
-    )
+message = create_message(
+    data,
+    market_comment
+)
 
-    send_telegram(message)
+send_telegram(message)
