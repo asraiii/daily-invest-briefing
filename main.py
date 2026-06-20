@@ -185,13 +185,13 @@ def get_invest_signal(data):
     sp = abs(data["S&P500"]["drawdown"])
 
     if sp < 10:
-        return "🟢 일반 적립 구간"
+        return "🟢 정기투자만 유지"
 
     elif sp < 20:
-        return "🟡 추가 매수 고려 구간"
+        return "🟡 여유자금 투입 고려"
 
     else:
-        return "🔴 적극 매수 구간"
+        return "🔴 적극 매수 기회"
         
         
 # -----------------------------
