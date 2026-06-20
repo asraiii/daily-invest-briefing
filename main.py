@@ -29,6 +29,9 @@ def get_market_data():
 
             close = hist_5d["Close"].dropna().tail(2).values
 
+            print(name)
+            print(close)
+            
             if len(close) >= 2:
                 daily_change = (
                     (close[-1] - close[-2])
