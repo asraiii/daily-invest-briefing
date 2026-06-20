@@ -53,7 +53,8 @@ def get_market_data():
 
             data[name] = {
                 "daily": round(float(daily_change), 2),
-                "drawdown": round(float(drawdown), 2)
+                "drawdown": round(float(drawdown), 2),
+                "current": round(float(current_price), 2)
             }
 
         except Exception as e:
@@ -61,7 +62,8 @@ def get_market_data():
 
             data[name] = {
                 "daily": 0,
-                "drawdown": 0
+                "drawdown": 0,
+                "current": 0
             }
 
     return data
@@ -168,17 +170,27 @@ def get_market_comment(data):
         )
 
     # 변동성
-    if vix <= -5:
+    vix_now = data["VIX"]["current"]
+
+    if vix_now < 15:
         comments.append(
-            "VIX가 크게 하락하며 시장의 공포 심리가 완화되었습니다."
+            f"현재 VIX는 {vix_now:.2f}로 비교적 안정·낙관 국면에 해당합니다."
         )
 
-    elif vix >= 5:
+    elif vix_now < 20:
         comments.append(
-            "VIX가 상승하며 단기 변동성 확대 가능성이 나타나고 있습니다."
+            f"현재 VIX는 {vix_now:.2f}로 보통 수준의 변동성 환경입니다."
         )
 
-    # 투자 전략
+    elif vix_now < 30:
+        comments.append(
+            f"현재 VIX는 {vix_now:.2f}로 불안감이 커지는 구간입니다."
+        )
+
+    else:
+        comments.append(
+            f"현재 VIX는 {vix_now:.2f}로 공포가 확대된 상태입니다."
+        )
 
     return "\n".join(comments)
 
@@ -196,8 +208,11 @@ def create_message(data, market_comment):
         "[오늘 시장 등락]",
         f"S&P500 : {data['S&P500']['daily']}%",
         f"NASDAQ : {data['NASDAQ']['daily']}%",
-        f"VIX : {data['VIX']['daily']}%",
-        f"USD/KRW : {data['USDKRW']['daily']}%",
+        f"환율 : {data['USDKRW']['current']:.0f}원",
+        "",
+
+        "[VIX 지수]",
+        f"{data['VIX']['current']}",
         "",
 
         "[최근 1년 최고점 대비]",
