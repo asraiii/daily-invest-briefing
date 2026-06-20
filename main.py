@@ -204,29 +204,6 @@ def get_market_comment(data):
             "장기 투자자에게는 적극적인 매수 기회가 될 수 있습니다."
         )
 
-    # 변동성
-    vix_now = data["VIX"]["current"]
-
-    if vix_now < 15:
-        comments.append(
-            f"현재 VIX는 {vix_now:.2f}로 비교적 안정·낙관 국면에 해당합니다."
-        )
-
-    elif vix_now < 20:
-        comments.append(
-            f"현재 VIX는 {vix_now:.2f}로 보통 수준의 변동성 환경입니다."
-        )
-
-    elif vix_now < 30:
-        comments.append(
-            f"현재 VIX는 {vix_now:.2f}로 불안감이 커지는 구간입니다."
-        )
-
-    else:
-        comments.append(
-            f"현재 VIX는 {vix_now:.2f}로 공포가 확대된 상태입니다."
-        )
-
     return "\n".join(comments)
 
 
