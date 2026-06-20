@@ -196,12 +196,31 @@ def get_market_comment(data):
 
     return "\n".join(comments)
 
+
+# -----------------------------
+# 투자신호
+# -----------------------------
+def get_invest_signal(data):
+
+    sp = abs(data["S&P500"]["drawdown"])
+
+    if sp < 10:
+        return "🟢 일반 적립 구간"
+
+    elif sp < 20:
+        return "🟡 추가 매수 고려 구간"
+
+    else:
+        return "🔴 적극 매수 구간"
+        
+        
 # -----------------------------
 # 3. 브리핑 생성
 # -----------------------------
 def create_message(data, market_comment):
 
     now = datetime.now().strftime("%Y-%m-%d")
+    signal = get_invest_signal(data)
 
     lines = [
         f"📊 투자 브리핑 ({now})",
@@ -222,6 +241,11 @@ def create_message(data, market_comment):
         f"NASDAQ : {data['NASDAQ']['drawdown']}%",
         "",
 
+        "[투자신호]",
+        signal,
+        "",
+
+        
         "[시장 해설]",
         market_comment
     ]
