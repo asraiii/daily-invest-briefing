@@ -78,10 +78,22 @@ def get_fear_greed():
     try:
         url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
 
-        response = requests.get(url, timeout=10)
+        response = requests.get(
+            url,
+            timeout=10,
+            headers={
+                "User-Agent": "Mozilla/5.0"
+            }
+        )
+
+        print(response.status_code)
+        print(response.text[:300])
+
         data = response.json()
 
-        score = int(data["fear_and_greed"]["score"])
+        score = int(
+            data["fear_and_greed"]["score"]
+        )
 
         if score < 25:
             status = "😱 극도의 공포"
