@@ -198,19 +198,20 @@ def create_message(data, market_comment):
 
     now = datetime.now().strftime("%Y-%m-%d")
     signal = get_invest_signal(data)
+
     vix_now = data["VIX"]["current"]
 
-if vix_now < 15:
-    vix_status = "안정·낙관"
+    if vix_now < 15:
+        vix_status = "안정·낙관"
 
-elif vix_now < 20:
-    vix_status = "보통"
+    elif vix_now < 20:
+        vix_status = "보통"
 
-elif vix_now < 30:
-    vix_status = "불안 증가"
+    elif vix_now < 30:
+        vix_status = "불안 증가"
 
-else:
-    vix_status = "공포 확대"
+    else:
+        vix_status = "공포 확대"
 
     lines = [
         f"📊 투자 브리핑 ({now})",
@@ -235,14 +236,12 @@ else:
         signal,
         "",
 
-        
         "[시장 해설]",
         market_comment
     ]
 
     return "\n".join(lines)
-
-
+    
 # -----------------------------
 # 4. 텔레그램 전송
 # -----------------------------
