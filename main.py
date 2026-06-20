@@ -180,8 +180,6 @@ def get_market_comment(data):
         )
 
     # 투자 전략
-    comments.append("")
-    comments.append("장기 투자 관점에서는 VOO, QQQM, SCHD 적립식을 유지하는 전략이 유효합니다.")
 
     return "\n".join(comments)
 
