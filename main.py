@@ -113,6 +113,46 @@ def score_market(data):
         score += 10
 
     return min(score, 100)
+
+def get_total_score(data):
+
+    sp = abs(data["S&P500"]["drawdown"])
+    nd = abs(data["NASDAQ"]["drawdown"])
+    vix = data["VIX"]["current"]
+    fx = data["USDKRW"]["current"]
+
+    score = 0
+
+    # 📉 S&P500 (핵심)
+    if sp >= 20:
+        score += 35
+    elif sp >= 10:
+        score += 25
+    elif sp >= 5:
+        score += 15
+
+    # 📉 NASDAQ
+    if nd >= 15:
+        score += 15
+    elif nd >= 10:
+        score += 10
+
+    # 😱 VIX (공포일수록 점수 높음)
+    if vix >= 30:
+        score += 25
+    elif vix >= 20:
+        score += 15
+    elif vix >= 15:
+        score += 5
+
+    # 💱 환율 (낮을수록 좋음)
+    if fx < 1400:
+        score += 25
+    elif fx < 1500:
+        score += 15
+
+    return min(score, 100)
+
 def get_market_comment(data):
 
     sp = abs(data["S&P500"]["drawdown"])
@@ -230,16 +270,16 @@ def get_fx_light(fx):
 # -----------------------------
 def get_invest_signal(data):
 
-    sp = abs(data["S&P500"]["drawdown"])
+    score = get_total_score(data)
 
-    if sp < 10:
-        return "🟢 정기투자만 유지"
+    if score >= 75:
+        return "🔴 적극 분할 매수 구간"
 
-    elif sp < 20:
-        return "🟡 여유자금 투입 고려"
+    elif score >= 50:
+        return "🟡 추가 매수 고려 구간"
 
     else:
-        return "🔴 적극 매수 기회"
+        return "🟢 정기 적립 유지 구간"
         
         
 # -----------------------------
@@ -249,6 +289,7 @@ def create_message(data, market_comment):
 
     now = datetime.now().strftime("%Y-%m-%d")
     signal = get_invest_signal(data)
+    score = get_total_score(data)
 
     sp_light = get_drawdown_light(
         data["S&P500"]["drawdown"]
@@ -294,6 +335,10 @@ def create_message(data, market_comment):
         "[최근 1년 최고점 대비]",
         f"S&P500 : {data['S&P500']['drawdown']}% {sp_light}",
         f"NASDAQ : {data['NASDAQ']['drawdown']}% {nd_light}",
+        "",
+
+        "[종합 점수]",
+        f"{score}/100",
         "",
 
         "[투자신호]",
