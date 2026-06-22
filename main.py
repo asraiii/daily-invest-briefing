@@ -2,7 +2,7 @@ import os
 import requests
 import yfinance as yf
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas_market_calendars as mcal
 
@@ -36,6 +36,26 @@ def get_market_holiday_reason():
 
     # 그 외 NYSE 휴장일
     return "미국 증시 휴장일"
+
+def get_next_market_open():
+
+    nyse = mcal.get_calendar("NYSE")
+
+    today = datetime.now().date()
+
+    schedule = nyse.schedule(
+        start_date=today,
+        end_date=today + timedelta(days=14)
+    )
+
+    for day in schedule.index:
+
+        market_date = day.date()
+
+        if market_date > today:
+            return market_date.strftime("%Y-%m-%d")
+
+    return "확인불가"
 
 # -----------------------------
 # 1. 시장 데이터 수집
@@ -280,6 +300,26 @@ def get_vix_light(vix):
         return "🔴"
 
 # -----------------------------
+# 시장 심리
+# -----------------------------
+def get_market_mood(vix):
+
+    if vix < 15:
+        return "😎 매우 낙관"
+
+    elif vix < 20:
+        return "🙂 낙관"
+
+    elif vix < 30:
+        return "😐 중립"
+
+    elif vix < 40:
+        return "😟 공포"
+
+    else:
+        return "😱 극도의 공포"
+
+# -----------------------------
 # 환율 신호등
 # -----------------------------
 def get_fx_light(fx):
@@ -311,7 +351,163 @@ def get_invest_signal(data):
     else:
         return "🟢 정기 적립 유지 구간"
         
-        
+
+# -----------------------------
+# 오늘 행동 추천
+# -----------------------------
+def get_action_plan(data):
+
+    score = get_total_score(data)
+
+    if score >= 75:
+        return (
+            "✅ 정기 매수 진행\n"
+            "🔥 적극 분할 매수 시작 가능"
+        )
+
+    elif score >= 50:
+        return (
+            "✅ 정기 매수 진행\n"
+            "✅ 여유 현금 일부 추가 매수 고려"
+        )
+
+    else:
+        return (
+            "✅ 정기 매수 진행\n"
+            "❌ 추가 매수는 기다림"
+        )
+
+# -----------------------------
+# 점수 등급
+# -----------------------------
+def get_score_grade(score):
+
+    if score >= 90:
+        return "S"
+
+    elif score >= 75:
+        return "A"
+
+    elif score >= 50:
+        return "B"
+
+    elif score >= 25:
+        return "C"
+
+    else:
+        return "D"
+
+# -----------------------------
+# 내 ETF 매력도
+# -----------------------------
+def get_etf_ranking(data):
+
+    sp = abs(data["S&P500"]["drawdown"])
+    nd = abs(data["NASDAQ"]["drawdown"])
+    vix = data["VIX"]["current"]
+
+    scores = {
+        "VOO": sp,
+        "QQQM": nd,
+        "SCHD": max(vix - 10, 0)
+    }
+
+    ranking = sorted(
+        scores.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    result = []
+
+    medals = ["🥇", "🥈", "🥉"]
+
+    for idx, (ticker, score) in enumerate(ranking):
+
+        if score >= 20:
+            stars = "★★★★★"
+
+        elif score >= 15:
+            stars = "★★★★☆"
+
+        elif score >= 10:
+            stars = "★★★☆☆"
+
+        elif score >= 5:
+            stars = "★★☆☆☆"
+
+        else:
+            stars = "★☆☆☆☆"
+
+        result.append(
+            f"{medals[idx]} {ticker:<5} {stars}"
+        )
+
+    return "\n".join(result)
+
+# -----------------------------
+# 내 포트폴리오 환경
+# -----------------------------
+def get_portfolio_environment(data):
+
+    sp = abs(data["S&P500"]["drawdown"])
+    nd = abs(data["NASDAQ"]["drawdown"])
+    vix = data["VIX"]["current"]
+
+    # S&P500 계열
+    if sp >= 20:
+        sp_env = "🔥 매우 좋은 매수 환경"
+    elif sp >= 10:
+        sp_env = "✅ 좋은 매수 환경"
+    else:
+        sp_env = "➖ 평상시 환경"
+
+    # 나스닥 계열
+    if nd >= 25:
+        nd_env = "🔥 매우 좋은 매수 환경"
+    elif nd >= 15:
+        nd_env = "✅ 좋은 매수 환경"
+    else:
+        nd_env = "➖ 평상시 환경"
+
+    # 배당주 계열
+    if vix >= 25:
+        div_env = "🔥 매수 우호적"
+    elif vix >= 15:
+        div_env = "✅ 보통"
+    else:
+        div_env = "➖ 다소 고평가"
+
+    return {
+        "sp": sp_env,
+        "nd": nd_env,
+        "div": div_env
+    }
+
+
+# -----------------------------
+# 오늘의 우선 매수
+# -----------------------------
+def get_today_pick(data):
+
+    sp = abs(data["S&P500"]["drawdown"])
+    nd = abs(data["NASDAQ"]["drawdown"])
+    vix = data["VIX"]["current"]
+
+    scores = {
+        "VOO": sp,
+        "QQQM": nd,
+        "SCHD": max(vix - 10, 0)
+    }
+
+    ranked = sorted(
+        scores.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    return ranked
+
 # -----------------------------
 # 3. 브리핑 생성
 # -----------------------------
@@ -320,6 +516,10 @@ def create_message(data, market_comment):
     now = datetime.now().strftime("%Y-%m-%d")
     signal = get_invest_signal(data)
     score = get_total_score(data)
+    grade = get_score_grade(score)
+    action_plan = get_action_plan(data)
+    portfolio = get_portfolio_environment(data)
+    today_pick = get_today_pick(data)
 
     sp_light = get_drawdown_light(
         data["S&P500"]["drawdown"]
@@ -335,6 +535,7 @@ def create_message(data, market_comment):
     fx_light = get_fx_light(fx)
 
     vix_light = get_vix_light(vix_now)
+    market_mood = get_market_mood(vix_now)
 
     if vix_now < 15:
         vix_status = "안정·낙관"
@@ -362,6 +563,10 @@ def create_message(data, market_comment):
         f"현재 VIX : {vix_now:.2f} {vix_light} ({vix_status})",
         "",
 
+        "[시장 심리]",
+        market_mood,
+        "",
+
         "[최근 1년 최고점 대비]",
         f"S&P500 : {data['S&P500']['drawdown']}% {sp_light}",
         f"NASDAQ : {data['NASDAQ']['drawdown']}% {nd_light}",
@@ -369,12 +574,37 @@ def create_message(data, market_comment):
 
         "[종합 점수]",
         f"{score}/100",
+        f"등급 : {grade}",
         "",
 
         "[투자신호]",
         signal,
         "",
 
+        "[오늘 행동]",
+        action_plan,
+        "",
+
+        "[내 포트폴리오 환경]",
+        "",
+        "📈 미국 S&P500 계열",
+        "(VOO / TIGER S&P500 / KODEX S&P500)",
+        portfolio["sp"],
+        "",
+        "📈 미국 나스닥 계열",
+        "(QQQM / KODEX 나스닥100)",
+        portfolio["nd"],
+        "",
+        "💰 배당주 계열",
+        "(SCHD / TIGER 미국배당다우존스)",
+        portfolio["div"],
+        "",
+        "[오늘의 우선 매수]",
+        f"🥇 1위 : {today_pick[0][0]}",
+        f"🥈 2위 : {today_pick[1][0]}",
+        f"🥉 3위 : {today_pick[2][0]}",
+        "",
+        
         "[시장 해설]",
         market_comment
     ]
@@ -401,9 +631,13 @@ holiday_reason = get_market_holiday_reason()
 
 if holiday_reason:
 
+    next_open = get_next_market_open()
+
     send_telegram(
-        f"💤 오늘은 {holiday_reason}입니다.\n\n미국 증시가 휴장하여 투자 브리핑을 쉬어갑니다.\n다음 거래일에 다시 찾아올게요."
-)
+        f"💤 오늘은 {holiday_reason}입니다.\n\n"
+        f"미국 증시 휴장일이라 투자 브리핑을 쉬어갑니다.\n\n"
+        f"📅 다음 개장일 : {next_open}"
+    )
 
 else:
 
