@@ -127,42 +127,6 @@ def get_market_data():
 # -----------------------------
 # 2. 간단 점수 시스템
 # -----------------------------
-def score_market(data):
-
-    print(data)
-
-    score = 0
-
-    sp = abs(data["S&P500"]["drawdown"])
-    nd = abs(data["NASDAQ"]["drawdown"])
-
-    # S&P500 기준
-    if sp >= 5:
-        score += 20
-
-    if sp >= 10:
-        score += 20
-
-    if sp >= 15:
-        score += 20
-
-    if sp >= 20:
-        score += 20
-
-    if sp >= 30:
-        score += 20
-
-    # NASDAQ 보정
-    if nd >= 10:
-        score += 10
-
-    if nd >= 15:
-        score += 10
-
-    if nd >= 20:
-        score += 10
-
-    return min(score, 100)
 
 def get_total_score(data):
 
@@ -207,7 +171,6 @@ def get_market_comment(data):
 
     sp = abs(data["S&P500"]["drawdown"])
     nd = abs(data["NASDAQ"]["drawdown"])
-    vix = data["VIX"]["daily"]
 
     comments = []
 
@@ -398,91 +361,42 @@ def get_score_grade(score):
         return "D"
 
 # -----------------------------
-# 내 ETF 매력도
+# 포트폴리오 별점
 # -----------------------------
-def get_etf_ranking(data):
+def get_portfolio_stars(data):
 
     sp = abs(data["S&P500"]["drawdown"])
     nd = abs(data["NASDAQ"]["drawdown"])
-    vix = data["VIX"]["current"]
-
-    scores = {
-        "VOO": sp,
-        "QQQM": nd,
-        "SCHD": max(vix - 10, 0)
-    }
-
-    ranking = sorted(
-        scores.items(),
-        key=lambda x: x[1],
-        reverse=True
-    )
-
-    result = []
-
-    medals = ["🥇", "🥈", "🥉"]
-
-    for idx, (ticker, score) in enumerate(ranking):
-
-        if score >= 20:
-            stars = "★★★★★"
-
-        elif score >= 15:
-            stars = "★★★★☆"
-
-        elif score >= 10:
-            stars = "★★★☆☆"
-
-        elif score >= 5:
-            stars = "★★☆☆☆"
-
-        else:
-            stars = "★☆☆☆☆"
-
-        result.append(
-            f"{medals[idx]} {ticker:<5} {stars}"
-        )
-
-    return "\n".join(result)
-
-# -----------------------------
-# 내 포트폴리오 환경
-# -----------------------------
-def get_portfolio_environment(data):
-
-    sp = abs(data["S&P500"]["drawdown"])
-    nd = abs(data["NASDAQ"]["drawdown"])
-    vix = data["VIX"]["current"]
 
     # S&P500 계열
     if sp >= 20:
-        sp_env = "🔥 매우 좋은 매수 환경"
+        sp_stars = "★★★★★"
     elif sp >= 10:
-        sp_env = "✅ 좋은 매수 환경"
+        sp_stars = "★★★★☆"
+    elif sp >= 5:
+        sp_stars = "★★★☆☆"
     else:
-        sp_env = "➖ 평상시 환경"
+        sp_stars = "★★☆☆☆"
 
     # 나스닥 계열
     if nd >= 25:
-        nd_env = "🔥 매우 좋은 매수 환경"
+        nd_stars = "★★★★★"
     elif nd >= 15:
-        nd_env = "✅ 좋은 매수 환경"
+        nd_stars = "★★★★☆"
+    elif nd >= 10:
+        nd_stars = "★★★☆☆"
     else:
-        nd_env = "➖ 평상시 환경"
+        nd_stars = "★★☆☆☆"
 
     # 배당주 계열
-    if vix >= 25:
-        div_env = "🔥 매수 우호적"
-    elif vix >= 15:
-        div_env = "✅ 보통"
+    if sp >= 20:
+        div_stars = "★★★★☆"
+    elif sp >= 10:
+        div_stars = "★★★☆☆"
     else:
-        div_env = "➖ 다소 고평가"
+        div_stars = "★★☆☆☆"
 
-    return {
-        "sp": sp_env,
-        "nd": nd_env,
-        "div": div_env
-    }
+    return sp_stars, nd_stars, div_stars
 
 
 # -----------------------------
@@ -492,12 +406,11 @@ def get_today_pick(data):
 
     sp = abs(data["S&P500"]["drawdown"])
     nd = abs(data["NASDAQ"]["drawdown"])
-    vix = data["VIX"]["current"]
 
     scores = {
         "VOO": sp,
         "QQQM": nd,
-        "SCHD": max(vix - 10, 0)
+        "SCHD": max(20 - sp, 0)
     }
 
     ranked = sorted(
@@ -518,7 +431,7 @@ def create_message(data, market_comment):
     score = get_total_score(data)
     grade = get_score_grade(score)
     action_plan = get_action_plan(data)
-    portfolio = get_portfolio_environment(data)
+    sp_stars, nd_stars, div_stars = get_portfolio_stars(data)
     today_pick = get_today_pick(data)
 
     sp_light = get_drawdown_light(
@@ -581,24 +494,27 @@ def create_message(data, market_comment):
         signal,
         "",
 
+        "[포트폴리오 평가]",
+
+        "📈 미국 S&P500 계열",
+        "(VOO / TIGER S&P500 / KODEX S&P500)",
+        sp_stars,
+        "",
+
+        "📈 미국 나스닥 계열",
+        "(QQQM / KODEX 나스닥100)",
+        nd_stars,
+        "",
+
+        "💰 배당주 계열",
+        "(SCHD / TIGER 미국배당다우존스)",
+        div_stars,
+        "",
+
         "[오늘 행동]",
         action_plan,
         "",
 
-        "[내 포트폴리오 환경]",
-        "",
-        "📈 미국 S&P500 계열",
-        "(VOO / TIGER S&P500 / KODEX S&P500)",
-        portfolio["sp"],
-        "",
-        "📈 미국 나스닥 계열",
-        "(QQQM / KODEX 나스닥100)",
-        portfolio["nd"],
-        "",
-        "💰 배당주 계열",
-        "(SCHD / TIGER 미국배당다우존스)",
-        portfolio["div"],
-        "",
         "[오늘의 우선 매수]",
         f"🥇 1위 : {today_pick[0][0]}",
         f"🥈 2위 : {today_pick[1][0]}",
