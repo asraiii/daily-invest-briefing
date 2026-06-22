@@ -1,11 +1,41 @@
 import os
 import requests
 import yfinance as yf
+
 from datetime import datetime
+
+import pandas_market_calendars as mcal
 
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
+# -----------------------------
+# 주말 여부 확인
+# -----------------------------
+def get_market_holiday_reason():
+
+    today = datetime.now().date()
+
+    nyse = mcal.get_calendar("NYSE")
+
+    schedule = nyse.schedule(
+        start_date=today,
+        end_date=today
+    )
+
+    # 거래일이면
+    if not schedule.empty:
+        return None
+
+    # 주말
+    if today.weekday() == 5:
+        return "토요일"
+
+    if today.weekday() == 6:
+        return "일요일"
+
+    # 그 외 NYSE 휴장일
+    return "미국 증시 휴장일"
 
 # -----------------------------
 # 1. 시장 데이터 수집
@@ -367,13 +397,23 @@ def send_telegram(message):
 # 실행
 # -----------------------------
 
-data = get_market_data()
+holiday_reason = get_market_holiday_reason()
 
-market_comment = get_market_comment(data)
+if holiday_reason:
 
-message = create_message(
-    data,
-    market_comment
+    send_telegram(
+        f"💤 오늘은 {holiday_reason}입니다.\n\n미국 증시가 휴장하여 투자 브리핑을 쉬어갑니다.\n다음 거래일에 다시 찾아올게요."
 )
 
-send_telegram(message)
+else:
+
+    data = get_market_data()
+
+    market_comment = get_market_comment(data)
+
+    message = create_message(
+        data,
+        market_comment
+    )
+
+    send_telegram(message)
