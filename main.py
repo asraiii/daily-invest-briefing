@@ -431,8 +431,24 @@ def create_message(data, market_comment):
     score = get_total_score(data)
     grade = get_score_grade(score)
     action_plan = get_action_plan(data)
+    strategy = f"{signal}\n{action_plan}"
     sp_stars, nd_stars, div_stars = get_portfolio_stars(data)
     today_pick = get_today_pick(data)
+
+    if score >= 50:
+
+        pick_lines = [
+            "",
+            "[우선 매수 순위]",
+            f"🥇 1위 : {today_pick[0][0]}",
+            f"🥈 2위 : {today_pick[1][0]}",
+            f"🥉 3위 : {today_pick[2][0]}",
+            ""
+        ]
+
+    else:
+
+        pick_lines = []
 
     sp_light = get_drawdown_light(
         data["S&P500"]["drawdown"]
@@ -472,12 +488,8 @@ def create_message(data, market_comment):
         f"환율 : {fx:,.0f}원 {fx_light}",
         "",
 
-        "[VIX 지수]",
-        f"현재 VIX : {vix_now:.2f} {vix_light} ({vix_status})",
-        "",
-
-        "[시장 심리]",
-        market_mood,
+        "[VIX · 시장심리]",
+        f"{vix_now:.2f} {vix_light} {market_mood}",
         "",
 
         "[최근 1년 최고점 대비]",
@@ -485,45 +497,24 @@ def create_message(data, market_comment):
         f"NASDAQ : {data['NASDAQ']['drawdown']}% {nd_light}",
         "",
 
-        "[종합 점수]",
-        f"{score}/100",
-        f"등급 : {grade}",
+        "[투자환경]",
+        f"{grade}등급 ({score}점)",
         "",
 
-        "[투자신호]",
-        signal,
+        "[오늘의 전략]",
+        strategy,
         "",
 
         "[포트폴리오 평가]",
-
-        "📈 미국 S&P500 계열",
-        "(VOO / TIGER S&P500 / KODEX S&P500)",
-        sp_stars,
+        f"📈 S&P500 : {sp_stars}",
+        f"📈 NASDAQ : {nd_stars}",
+        f"💰 배당주 : {div_stars}",
         "",
-
-        "📈 미국 나스닥 계열",
-        "(QQQM / KODEX 나스닥100)",
-        nd_stars,
-        "",
-
-        "💰 배당주 계열",
-        "(SCHD / TIGER 미국배당다우존스)",
-        div_stars,
-        "",
-
-        "[오늘 행동]",
-        action_plan,
-        "",
-
-        "[오늘의 우선 매수]",
-        f"🥇 1위 : {today_pick[0][0]}",
-        f"🥈 2위 : {today_pick[1][0]}",
-        f"🥉 3위 : {today_pick[2][0]}",
-        "",
-        
+       
         "[시장 해설]",
         market_comment
-    ]
+        
+    ] + pick_lines
 
     return "\n".join(lines)
     
